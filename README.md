@@ -107,6 +107,17 @@ A `Dockerfile` is included for easy containerization.
     docker run -d -p 8000:8000 --env-file .env logistics-marketplace
     ```
 
+## Project Structure
+
+The project follows a standard FastAPI application layout:
+
+-   `app/`: The main application directory.
+    -   `main.py`: The entry point for the FastAPI application.
+    -   `core/`: Contains core application logic, such as configuration and security.
+    -   `models/`: Contains the SQLAlchemy database models.
+    -   `schemas/`: Contains the Pydantic schemas for data validation and serialization.
+    -   `routers/`: Contains the API routers for different endpoints.
+
 ## 6. API Structure
 
 ### Auth Endpoints
