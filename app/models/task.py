@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, ForeignKey, Float, Enum
 from sqlalchemy.orm import relationship
 from app.db import Base
+from app.models.task_meta import task_tag_link
 import enum
 
 class TaskStatus(enum.Enum):
@@ -26,6 +27,7 @@ class Task(Base):
     title = Column(String, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    category_id = Column(Integer, ForeignKey("task_categories.id"))
     price = Column(Float)
     estimated_time = Column(Integer) # in minutes
     start_datetime = Column(DateTime(timezone=True))
@@ -35,10 +37,18 @@ class Task(Base):
     accepted_at = Column(DateTime(timezone=True), nullable=True)
     done_at = Column(DateTime(timezone=True), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
+    start_location_country_id = Column(Integer, ForeignKey("countries.id"))
+    start_location_province_id = Column(Integer, ForeignKey("provinces.id"))
+    start_location_city_id = Column(Integer, ForeignKey("cities.id"))
+    address = Column(String)
+    lat = Column(Float)
+    lng = Column(Float)
 
     business = relationship("Business")
     assigned_user = relationship("User")
     steps = relationship("TaskStep", back_populates="task")
+    category = relationship("TaskCategory", back_populates="tasks")
+    tags = relationship("TaskTag", secondary=task_tag_link, back_populates="tasks")
 
 class TaskStep(Base):
     __tablename__ = "task_steps"
@@ -48,6 +58,10 @@ class TaskStep(Base):
     title = Column(String)
     description = Column(String, nullable=True)
     address = Column(String)
+    lat = Column(Float)
+    lng = Column(Float)
+    estimated_time = Column(Integer)
+    start_time = Column(DateTime(timezone=True))
     status = Column(Enum(StepStatus), default=StepStatus.pending)
     order = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
