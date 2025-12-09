@@ -33,5 +33,6 @@ def verify_otp(otp_verify: OTPVerify, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(user)
 
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "is_verified": user.verification_status == VerificationStatus.verified})
+    role_name = user.role.name if user.role else "user"
+    access_token = create_access_token(data={"sub": str(user.id), "role": role_name, "is_verified": user.verification_status == VerificationStatus.verified})
     return {"access_token": access_token, "token_type": "bearer"}
