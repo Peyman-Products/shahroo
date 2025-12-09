@@ -1,17 +1,13 @@
-# Database Migration and Seeding
+# Database Seeding
 
-This directory contains scripts for managing the database schema and data.
+This directory contains scripts for seeding the database with initial data.
 
-## Running the Migration
+## Running the Seeding Script
 
-To run the database migration and seed the database with initial data, run the following command from the root of the project:
+To seed the database with initial roles and permissions, run the following command from the root of the project:
 
 ```bash
-python scripts/run_migration.py
+python scripts/seed_data.py
 ```
 
-This script will:
-
-1.  Create all tables in the database if they don't exist.
-2.  Perform a data migration to move from the old `role` column to the new `role_id` column in the `users` table.
-3.  Seed the database with initial roles and permissions if they don't already exist.
+This script will populate the database with the initial roles (`owner`, `admin`, `user`) and permissions (`create_task`) if they don't already exist.
