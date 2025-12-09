@@ -9,3 +9,4 @@ python-dotenv
 kavenegar
 pydantic-settings
 python-multipart
+alembic
