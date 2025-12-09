@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -7,8 +7,5 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     KAVENEGAR_API_KEY: str
     KAVENEGAR_OTP_TEMPLATE: str
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
