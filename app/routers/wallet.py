@@ -17,6 +17,10 @@ def get_or_create_wallet(db: Session, user_id: int) -> Wallet:
         db.refresh(wallet)
     return wallet
 
+from app.schemas.wallet import WalletTransaction as WalletTransactionSchema
+from app.models.wallet import WalletTransaction
+from typing import List
+
 @router.get("/me", response_model=WalletSchema, summary="Get current user's wallet")
 def read_user_wallet(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
@@ -24,3 +28,12 @@ def read_user_wallet(db: Session = Depends(get_db), current_user: User = Depends
     """
     wallet = get_or_create_wallet(db, current_user.id)
     return wallet
+
+@router.get("/me/transactions", response_model=List[WalletTransactionSchema], summary="Get current user's wallet transactions")
+def read_user_wallet_transactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Retrieves the wallet transactions of the currently authenticated user.
+    """
+    wallet = get_or_create_wallet(db, current_user.id)
+    transactions = db.query(WalletTransaction).filter(WalletTransaction.wallet_id == wallet.id).offset(skip).limit(limit).all()
+    return transactions
