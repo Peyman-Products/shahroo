@@ -34,14 +34,125 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
     op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
+    op.create_table('users',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('first_name', sa.String(), nullable=True),
+    sa.Column('last_name', sa.String(), nullable=True),
+    sa.Column('phone_number', sa.String(), nullable=False),
+    sa.Column('birthdate', sa.Date(), nullable=True),
+    sa.Column('sex', sa.String(), nullable=True),
+    sa.Column('national_id', sa.String(), nullable=True),
+    sa.Column('address', sa.String(), nullable=True),
+    sa.Column('id_card_image', sa.String(), nullable=True),
+    sa.Column('selfie_image', sa.String(), nullable=True),
+    sa.Column('verification_status', sa.Enum('unverified', 'pending', 'verified', 'rejected', name='verificationstatus'), nullable=True),
+    sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+    op.create_index(op.f('ix_users_phone_number'), 'users', ['phone_number'], unique=True)
+    op.create_table('businesses',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('owner_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_businesses_id'), 'businesses', ['id'], unique=False)
+    op.create_table('locations',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('latitude', sa.Float(), nullable=True),
+    sa.Column('longitude', sa.Float(), nullable=True),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_locations_id'), 'locations', ['id'], unique=False)
+    op.create_table('media',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('url', sa.String(), nullable=True),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_media_id'), 'media', ['id'], unique=False)
+    op.create_table('otps',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('phone_number', sa.String(), nullable=True),
+    sa.Column('otp_code', sa.String(), nullable=True),
+    sa.Column('expires_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_otps_id'), 'otps', ['id'], unique=False)
     op.create_table('role_permissions',
     sa.Column('role_id', sa.Integer(), nullable=True),
     sa.Column('permission_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ),
     sa.ForeignKeyConstraint(['role_id'], ['roles.id'], )
     )
-    op.add_column('users', sa.Column('role_id', sa.Integer(), nullable=True))
-    op.create_foreign_key(None, 'users', 'roles', ['role_id'], ['id'])
+    op.create_table('tasks',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('business_id', sa.Integer(), nullable=True),
+    sa.Column('price', sa.Float(), nullable=True),
+    sa.Column('estimated_time', sa.Integer(), nullable=True),
+    sa.Column('status', sa.Enum('pending', 'in_progress', 'done', 'approved', 'rejected', name='taskstatus'), nullable=True),
+    sa.Column('assigned_user_id', sa.Integer(), nullable=True),
+    sa.Column('created_by_admin_id', sa.Integer(), nullable=True),
+    sa.Column('start_datetime', sa.DateTime(), nullable=True),
+    sa.Column('approved_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['assigned_user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['business_id'], ['businesses.id'], ),
+    sa.ForeignKeyConstraint(['created_by_admin_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_tasks_id'), 'tasks', ['id'], unique=False)
+    op.create_table('wallets',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('balance', sa.Float(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_wallets_id'), 'wallets', ['id'], unique=False)
+    op.create_table('task_meta',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('key', sa.String(), nullable=True),
+    sa.Column('value', sa.String(), nullable=True),
+    sa.Column('task_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['task_id'], ['tasks.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_task_meta_id'), 'task_meta', ['id'], unique=False)
+    op.create_table('task_steps',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('address', sa.String(), nullable=True),
+    sa.Column('order', sa.Integer(), nullable=True),
+    sa.Column('task_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['task_id'], ['tasks.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_task_steps_id'), 'task_steps', ['id'], unique=False)
+    op.create_table('wallet_transactions',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('wallet_id', sa.Integer(), nullable=True),
+    sa.Column('type', sa.Enum('earning', 'withdrawal', 'refund', name='transactiontype'), nullable=True),
+    sa.Column('amount', sa.Float(), nullable=True),
+    sa.Column('status', sa.Enum('pending', 'confirmed', 'rejected', name='transactionstatus'), nullable=True),
+    sa.Column('related_task_id', sa.Integer(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.ForeignKeyConstraint(['related_task_id'], ['tasks.id'], ),
+    sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_wallet_transactions_id'), 'wallet_transactions', ['id'], unique=False)
 
     # Seed the roles
     op.bulk_insert(roles_table,
@@ -56,9 +167,28 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint(None, 'users', type_='foreignkey')
-    op.drop_column('users', 'role_id')
+    op.drop_index(op.f('ix_wallet_transactions_id'), table_name='wallet_transactions')
+    op.drop_table('wallet_transactions')
+    op.drop_index(op.f('ix_task_steps_id'), table_name='task_steps')
+    op.drop_table('task_steps')
+    op.drop_index(op.f('ix_task_meta_id'), table_name='task_meta')
+    op.drop_table('task_meta')
+    op.drop_index(op.f('ix_wallets_id'), table_name='wallets')
+    op.drop_table('wallets')
+    op.drop_index(op.f('ix_tasks_id'), table_name='tasks')
+    op.drop_table('tasks')
     op.drop_table('role_permissions')
+    op.drop_index(op.f('ix_otps_id'), table_name='otps')
+    op.drop_table('otps')
+    op.drop_index(op.f('ix_media_id'), table_name='media')
+    op.drop_table('media')
+    op.drop_index(op.f('ix_locations_id'), table_name='locations')
+    op.drop_table('locations')
+    op.drop_index(op.f('ix_businesses_id'), table_name='businesses')
+    op.drop_table('businesses')
+    op.drop_index(op.f('ix_users_phone_number'), table_name='users')
+    op.drop_index(op.f('ix_users_id'), table_name='users')
+    op.drop_table('users')
     op.drop_index(op.f('ix_roles_name'), table_name='roles')
     op.drop_index(op.f('ix_roles_id'), table_name='roles')
     op.drop_table('roles')
