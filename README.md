@@ -28,7 +28,16 @@ The platform handles:
 -   **OTP Service:** Kavenegar
 -   **Configuration:** Pydantic V2 (pydantic-settings)
 
-## 3. Getting Started
+## 3. Quick Start
+
+1.  **Clone the repository:** `git clone <repository-url>`
+2.  **Create a virtual environment:** `python3 -m venv venv`
+3.  **Activate the virtual environment:** `source venv/bin/activate`
+4.  **Install dependencies:** `pip install -r requirements.txt`
+5.  **Create a `.env` file:** Copy the example below and fill in your details.
+6.  **Run the application:** `uvicorn app.main:app --reload`
+
+## 4. Getting Started
 
 ### Prerequisites
 
@@ -72,9 +81,36 @@ The platform handles:
     - `kavenegar`
     - `python-multipart`
 
-## 4. Configuration
+## 5. Configuration
 
-The application requires several environment variables to run correctly. Create a `.env` file in the project root and add the following variables:
+The application requires several environment variables to run correctly. Create a `.env` file in the project root and add the following variables.
+
+**Important:** The application will not start without a correctly configured `.env` file.
+
+```
+# .env
+
+# PostgreSQL Database
+# Example: postgresql://user:password@host:port/dbname
+DATABASE_URL=your_database_url
+
+# JWT Settings
+SECRET_KEY=your_jwt_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Kavenegar API
+KAVENEGAR_API_KEY=your_kavenegar_api_key
+KAVENEGAR_OTP_TEMPLATE=your_otp_template_name
+```
+
+To get started quickly, you can copy the `.env.example` file to `.env` and fill in the values:
+
+```bash
+cp .env.example .env
+```
+
+**Note:** Never commit your `.env` file to version control. Add it to your `.gitignore` file.
 
 ```
 # .env
@@ -94,7 +130,7 @@ KAVENEGAR_OTP_TEMPLATE=your_otp_template_name
 
 **Note:** Never commit your `.env` file to version control. Add it to your `.gitignore` file.
 
-## 5. Running the Application
+## 6. Running the Application
 
 ### Without Docker
 
@@ -133,7 +169,7 @@ The project follows a standard FastAPI application layout:
     -   `schemas/`: Contains the Pydantic schemas for data validation and serialization.
     -   `routers/`: Contains the API routers for different endpoints.
 
-## 6. API Structure
+## 7. API Structure
 
 ### Auth Endpoints
 
@@ -173,7 +209,7 @@ The project follows a standard FastAPI application layout:
 -   `GET /me/wallet`
 -   `GET /me/wallet/transactions`
 
-## 7. Deployment
+## 8. Deployment
 
 For a production environment, it's recommended to use a more robust setup. A common approach includes:
 
@@ -221,7 +257,7 @@ Run with:
 docker-compose up -d
 ```
 
-## 8. Future Enhancements
+## 9. Future Enhancements
 
 -   **Phase 2:** Business login, push notifications, task filtering by distance, geo-tracking, and delivery proof photos.
 -   **Phase 3:** Automatic identity verification, runner performance scores, bonus systems, and automatic bank settlements.
