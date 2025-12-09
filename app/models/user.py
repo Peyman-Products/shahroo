@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Date, Enum
+from sqlalchemy import Column, Integer, String, DateTime, func, Date, Enum, ForeignKey
+from sqlalchemy.orm import relationship
 from app.db import Base
 import enum
 
@@ -22,6 +23,7 @@ class User(Base):
     id_card_image = Column(String, nullable=True)
     selfie_image = Column(String, nullable=True)
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.unverified)
-    role = Column(String, default="user")
+    role_id = Column(Integer, ForeignKey("roles.id"))
+    role = relationship("Role")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

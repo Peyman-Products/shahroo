@@ -4,7 +4,7 @@ from typing import List
 from app.db import get_db
 from app.schemas.user import User as UserSchema
 from app.models.user import User, VerificationStatus
-from app.utils.deps import get_current_user
+from app.utils.deps import get_current_user, user_has_permission
 from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate
 from app.models.task import Task, TaskStep, TaskStatus
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 router = APIRouter()
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if not current_user.role or current_user.role.name not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user
 
@@ -39,10 +39,10 @@ def update_user_verification(user_id: int, status: VerificationStatus, db: Sessi
     db.refresh(db_user)
     return db_user
 
-@router.post("/tasks", response_model=TaskSchema, summary="Create a new task")
+@router.post("/tasks", response_model=TaskSchema, summary="Create a new task", dependencies=[Depends(user_has_permission("create_task"))])
 def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """
-    Creates a new task. Only accessible by admin users.
+    Creates a new task. Only accessible by admin users with the 'create_task' permission.
     """
     db_task = Task(**task.dict(exclude={"steps"}), created_by_admin_id=current_user.id)
     db.add(db_task)

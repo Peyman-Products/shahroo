@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.db import Base, engine
-from app.routers import auth, user, task, wallet, admin
+from app.routers import auth, user, task, wallet, admin, permission
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,6 +15,7 @@ app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(task.router, prefix="/tasks", tags=["tasks"])
 app.include_router(wallet.router, prefix="/wallet", tags=["wallet"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(permission.router, prefix="/permissions", tags=["permissions"])
 
 
 @app.get("/")
