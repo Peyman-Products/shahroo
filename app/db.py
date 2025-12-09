@@ -7,6 +7,8 @@ engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+from app.models import business, location, media, otp, task, task_meta, user, wallet
+
 def get_db():
     db = SessionLocal()
     try:
