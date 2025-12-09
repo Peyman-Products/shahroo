@@ -29,14 +29,14 @@ class TaskStep(TaskStepBase):
         orm_mode = True
 
 class TaskBase(BaseModel):
-    title: str
-    business_id: int
-    price: float
-    estimated_time: int
-    start_datetime: datetime
+    title: str = Field(..., example="Deliver package to customer")
+    business_id: int = Field(..., example=1)
+    price: float = Field(..., example=15.50)
+    estimated_time: int = Field(..., example=90)
+    start_datetime: datetime = Field(..., example="2025-01-01T12:00:00Z")
 
 class TaskCreate(TaskBase):
-    steps: List[TaskStepCreate] = []
+    steps: List[TaskStepCreate] = Field(..., example=[{"title": "Pick up package", "description": "Package is at the front desk", "address": "456 Oak Ave", "order": 1}])
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None

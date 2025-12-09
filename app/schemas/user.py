@@ -15,13 +15,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     pass
 
+from pydantic import Field
+
 class UserUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    birthdate: Optional[date] = None
-    sex: Optional[str] = None
-    national_id: Optional[str] = None
-    address: Optional[str] = None
+    first_name: Optional[str] = Field(None, example="John")
+    last_name: Optional[str] = Field(None, example="Doe")
+    birthdate: Optional[date] = Field(None, example="1990-01-01")
+    sex: Optional[str] = Field(None, example="Male")
+    national_id: Optional[str] = Field(None, example="1234567890")
+    address: Optional[str] = Field(None, example="123 Main St")
 
 class User(UserBase):
     id: int
