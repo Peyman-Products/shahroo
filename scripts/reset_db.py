@@ -10,20 +10,25 @@ from app.core.config import settings
 
 def main():
     """
-    Drops all tables in the database.
+    Drops all tables and custom types in the database.
     """
     engine = create_engine(settings.DATABASE_URL)
     inspector = inspect(engine)
 
-    # Get all table names
-    table_names = inspector.get_table_names()
-
     with engine.connect() as connection:
         with connection.begin() as transaction:
+            # Drop all tables
+            print("Dropping all tables...")
             for table_name in reversed(inspector.get_table_names()):
-                print(f"Dropping table {table_name}...")
                 connection.execute(text(f'DROP TABLE IF EXISTS "{table_name}" CASCADE;'))
-    print("All tables dropped successfully.")
+
+            # Drop all custom ENUM types
+            print("Dropping all custom ENUM types...")
+            result = connection.execute(text("SELECT typname FROM pg_type WHERE typtype = 'e'"))
+            for row in result:
+                connection.execute(text(f'DROP TYPE IF EXISTS "{row[0]}" CASCADE;'))
+
+    print("All tables and custom types dropped successfully.")
 
 if __name__ == "__main__":
     main()
