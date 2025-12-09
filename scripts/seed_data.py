@@ -1,11 +1,12 @@
 import os
 import sys
-from sqlalchemy.orm import Session
-from app.db import engine
-from app.models.permission import Permission
 
 # Add the app directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from sqlalchemy.orm import Session
+from app.db import engine
+from app.models.permission import Permission
 
 def main():
     """
