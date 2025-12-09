@@ -26,6 +26,7 @@ The platform handles:
 -   **Database:** PostgreSQL
 -   **Authentication:** JWT (JSON Web Tokens)
 -   **OTP Service:** Kavenegar
+-   **Configuration:** Pydantic V2 (pydantic-settings)
 
 ## 3. Getting Started
 
@@ -58,6 +59,19 @@ The platform handles:
     pip install -r requirements.txt
     ```
 
+    This will install all the necessary packages, including:
+    - `fastapi`
+    - `uvicorn`
+    - `sqlalchemy`
+    - `psycopg2-binary`
+    - `pydantic`
+    - `pydantic-settings`
+    - `python-jose[cryptography]`
+    - `passlib[bcrypt]`
+    - `python-dotenv`
+    - `kavenegar`
+    - `python-multipart`
+
 ## 4. Configuration
 
 The application requires several environment variables to run correctly. Create a `.env` file in the project root and add the following variables:
@@ -75,6 +89,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Kavenegar API
 KAVENEGAR_API_KEY=your_kavenegar_api_key
+KAVENEGAR_OTP_TEMPLATE=your_otp_template_name
 ```
 
 **Note:** Never commit your `.env` file to version control. Add it to your `.gitignore` file.
