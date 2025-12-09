@@ -1,13 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from app.models.task import TaskStatus, StepStatus
 
 class TaskStepBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    address: str
-    order: int
+    title: str = Field(..., example="Pick up package")
+    description: Optional[str] = Field(None, example="Package is at the front desk")
+    address: str = Field(..., example="456 Oak Ave")
+    order: int = Field(..., example=1)
 
 class TaskStepCreate(TaskStepBase):
     pass
@@ -26,7 +26,7 @@ class TaskStep(TaskStepBase):
     done_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TaskBase(BaseModel):
     title: str = Field(..., example="Deliver package to customer")
@@ -56,4 +56,4 @@ class Task(TaskBase):
     approved_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

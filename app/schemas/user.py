@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date
 from app.models.user import VerificationStatus
@@ -14,8 +14,6 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     pass
-
-from pydantic import Field
 
 class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, example="John")
@@ -33,4 +31,4 @@ class User(UserBase):
     role: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True

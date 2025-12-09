@@ -1,7 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
-
-from pydantic import Field
 
 class BusinessBase(BaseModel):
     name: str = Field(..., example="ACME Corporation")
