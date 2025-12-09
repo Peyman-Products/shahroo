@@ -23,12 +23,14 @@ class UserUpdate(BaseModel):
     national_id: Optional[str] = Field(None, example="1234567890")
     address: Optional[str] = Field(None, example="123 Main St")
 
+from app.schemas.permission import Role
+
 class User(UserBase):
     id: int
     id_card_image: Optional[str] = None
     selfie_image: Optional[str] = None
     verification_status: VerificationStatus
-    role: str
+    role: Optional[Role] = None
 
     class Config:
         from_attributes = True
