@@ -27,7 +27,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_permissions_id'), 'permissions', ['id'], unique=False)
     op.create_index(op.f('ix_permissions_name'), 'permissions', ['name'], unique=True)
-    op.create_table('roles',
+    roles_table = op.create_table('roles',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -42,6 +42,15 @@ def upgrade() -> None:
     )
     op.add_column('users', sa.Column('role_id', sa.Integer(), nullable=True))
     op.create_foreign_key(None, 'users', 'roles', ['role_id'], ['id'])
+
+    # Seed the roles
+    op.bulk_insert(roles_table,
+        [
+            {'name': 'owner'},
+            {'name': 'admin'},
+            {'name': 'user'}
+        ]
+    )
     # ### end Alembic commands ###
 
 
