@@ -14,10 +14,11 @@ def get_current_user(token: str = Depends(api_key_header), db: Session = Depends
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not token or not token.startswith("Bearer "):
+    if not token:
         raise credentials_exception
 
-    token = token.split("Bearer ")[1]
+    if token.startswith("Bearer "):
+        token = token.split("Bearer ")[1]
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
