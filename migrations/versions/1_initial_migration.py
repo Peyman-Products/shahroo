@@ -84,6 +84,8 @@ def upgrade() -> None:
     sa.Column('phone_number', sa.String(), nullable=True),
     sa.Column('otp_code', sa.String(), nullable=True),
     sa.Column('expires_at', sa.DateTime(), nullable=True),
+    sa.Column('used', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_otps_id'), 'otps', ['id'], unique=False)
