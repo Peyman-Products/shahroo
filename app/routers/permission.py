@@ -1,11 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.db import get_db
-from app.schemas.permission import Role, RoleCreate, Permission, PermissionCreate, UserRole
+from app.schemas.permission import (
+    Permission,
+    PermissionCreate,
+    Role,
+    RoleCreate,
+    RolePermission,
+    UserRole,
+    UserRoleUpdate,
+)
 from app.models.permission import Role as RoleModel, Permission as PermissionModel
 from app.models.user import User
 from app.utils.deps import get_current_user
+from app.schemas.user import User as UserSchema
 
 router = APIRouter()
 
@@ -40,8 +49,6 @@ def read_permissions(skip: int = 0, limit: int = 100, db: Session = Depends(get_
     permissions = db.query(PermissionModel).offset(skip).limit(limit).all()
     return permissions
 
-from app.schemas.permission import RolePermission
-
 @router.post("/users/roles")
 def assign_role_to_user(user_role: UserRole, db: Session = Depends(get_db), current_user: User = Depends(get_current_owner_or_admin_user)):
     user = db.query(User).filter(User.id == user_role.user_id).first()
@@ -65,3 +72,44 @@ def assign_permission_to_role(role_permission: RolePermission, db: Session = Dep
     role.permissions.append(permission)
     db.commit()
     return {"message": "Permission assigned to role successfully"}
+
+
+@router.get("/users/{user_id}/role", response_model=Optional[Role])
+def get_user_role(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_owner_or_admin_user)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.role
+
+
+@router.patch("/users/{user_id}/role", response_model=UserSchema)
+def update_user_role(user_id: int, role_update: UserRoleUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_owner_or_admin_user)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    role = db.query(RoleModel).filter(RoleModel.id == role_update.role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    user.role_id = role.id
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/make-admin", response_model=UserSchema)
+def make_user_admin(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_owner_or_admin_user)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    admin_role = db.query(RoleModel).filter(RoleModel.name == "admin").first()
+    if not admin_role:
+        admin_role = RoleModel(name="admin")
+        db.add(admin_role)
+        db.commit()
+        db.refresh(admin_role)
+
+    user.role_id = admin_role.id
+    db.commit()
+    db.refresh(user)
+    return user
