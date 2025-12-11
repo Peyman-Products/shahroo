@@ -1,18 +1,21 @@
 import random
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from kavenegar import *
 from app.core.config import settings
 from app.models.otp import OTP
+from app.utils.helpers import normalize_phone_number
 
 def generate_otp() -> str:
     return str(random.randint(100000, 999999))
 
 def send_otp(db: Session, phone_number: str):
+    normalized_phone = normalize_phone_number(phone_number)
     otp_code = generate_otp()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=2)
 
-    db_otp = OTP(phone_number=phone_number, otp_code=otp_code, expires_at=expires_at)
+    db_otp = OTP(phone_number=normalized_phone, otp_code=otp_code, expires_at=expires_at, used=False)
     db.add(db_otp)
     db.commit()
     db.refresh(db_otp)
@@ -20,7 +23,7 @@ def send_otp(db: Session, phone_number: str):
     try:
         api = KavenegarAPI(settings.KAVENEGAR_API_KEY)
         params = {
-            'receptor': phone_number,
+            'receptor': normalized_phone,
             'template': settings.KAVENEGAR_OTP_TEMPLATE,
             'token': otp_code,
             'type': 'sms',
@@ -35,10 +38,12 @@ def send_otp(db: Session, phone_number: str):
     return db_otp
 
 def verify_otp(db: Session, phone_number: str, otp_code: str):
+    normalized_phone = normalize_phone_number(phone_number)
+
     db_otp = db.query(OTP).filter(
-        OTP.phone_number == phone_number,
+        OTP.phone_number == normalized_phone,
         OTP.otp_code == otp_code,
-        OTP.used == False,
+        or_(OTP.used == False, OTP.used.is_(None)),
         OTP.expires_at > datetime.now(timezone.utc)
     ).first()
 
@@ -50,8 +55,10 @@ def verify_otp(db: Session, phone_number: str, otp_code: str):
 
 
 def get_valid_otp(db: Session, phone_number: str):
+    normalized_phone = normalize_phone_number(phone_number)
+
     return db.query(OTP).filter(
-        OTP.phone_number == phone_number,
-        OTP.used == False,
+        OTP.phone_number == normalized_phone,
+        or_(OTP.used == False, OTP.used.is_(None)),
         OTP.expires_at > datetime.now(timezone.utc)
     ).order_by(OTP.expires_at.desc()).first()
