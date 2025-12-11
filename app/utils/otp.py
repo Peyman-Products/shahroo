@@ -1,5 +1,6 @@
 import random
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from kavenegar import *
 from app.core.config import settings
@@ -12,7 +13,7 @@ def send_otp(db: Session, phone_number: str):
     otp_code = generate_otp()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=2)
 
-    db_otp = OTP(phone_number=phone_number, otp_code=otp_code, expires_at=expires_at)
+    db_otp = OTP(phone_number=phone_number, otp_code=otp_code, expires_at=expires_at, used=False)
     db.add(db_otp)
     db.commit()
     db.refresh(db_otp)
@@ -38,7 +39,7 @@ def verify_otp(db: Session, phone_number: str, otp_code: str):
     db_otp = db.query(OTP).filter(
         OTP.phone_number == phone_number,
         OTP.otp_code == otp_code,
-        OTP.used == False,
+        or_(OTP.used == False, OTP.used.is_(None)),
         OTP.expires_at > datetime.now(timezone.utc)
     ).first()
 
@@ -52,6 +53,6 @@ def verify_otp(db: Session, phone_number: str, otp_code: str):
 def get_valid_otp(db: Session, phone_number: str):
     return db.query(OTP).filter(
         OTP.phone_number == phone_number,
-        OTP.used == False,
+        or_(OTP.used == False, OTP.used.is_(None)),
         OTP.expires_at > datetime.now(timezone.utc)
     ).order_by(OTP.expires_at.desc()).first()
