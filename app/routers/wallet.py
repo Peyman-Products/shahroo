@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas.wallet import Wallet as WalletSchema
+from app.schemas.wallet import WalletCheckoutRequest, WalletTransaction as WalletTransactionSchema
 from app.models.wallet import Wallet
 from app.models.user import User
 from app.utils.deps import get_current_user
@@ -18,8 +20,7 @@ def get_or_create_wallet(db: Session, user_id: int) -> Wallet:
         db.refresh(wallet)
     return wallet
 
-from app.schemas.wallet import WalletTransaction as WalletTransactionSchema
-from app.models.wallet import WalletTransaction
+from app.models.wallet import TransactionStatus, TransactionType, WalletTransaction
 from typing import List
 
 @router.get("/me", response_model=WalletSchema, summary="Get current user's wallet")
@@ -40,3 +41,48 @@ def read_user_wallet_transactions(skip: int = 0, limit: int = 100, db: Session =
     refresh_wallet_balance(db, wallet)
     transactions = db.query(WalletTransaction).filter(WalletTransaction.wallet_id == wallet.id).offset(skip).limit(limit).all()
     return transactions
+
+
+@router.post("/me/checkout", response_model=WalletTransactionSchema, summary="Request a wallet checkout")
+def request_wallet_checkout(
+    payload: WalletCheckoutRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a payout transaction for the current user with a requested status. The
+    request is only allowed if the confirmed balance covers the requested amount
+    after accounting for other pending payouts.
+    """
+
+    wallet = get_or_create_wallet(db, current_user.id)
+    refresh_wallet_balance(db, wallet)
+
+    reserved_amount = (
+        db.query(func.coalesce(func.sum(WalletTransaction.amount), 0))
+        .filter(
+            WalletTransaction.wallet_id == wallet.id,
+            WalletTransaction.type == TransactionType.payout,
+            WalletTransaction.status.in_([TransactionStatus.requested, TransactionStatus.pending]),
+        )
+        .scalar()
+    )
+
+    available_balance = wallet.balance - reserved_amount
+
+    if payload.amount > available_balance:
+        raise HTTPException(status_code=400, detail="Insufficient available balance for checkout request")
+
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        type=TransactionType.payout,
+        amount=payload.amount,
+        status=TransactionStatus.requested,
+        description=payload.description or "Wallet checkout request",
+    )
+
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    return transaction
