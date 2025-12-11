@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.models.wallet import TransactionType, TransactionStatus
@@ -19,8 +20,7 @@ class WalletTransaction(WalletTransactionBase):
     wallet_id: int
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class WalletBase(BaseModel):
     balance: float
@@ -30,8 +30,7 @@ class Wallet(WalletBase):
     user_id: int
     transactions: List[WalletTransaction] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WalletCheckoutRequest(BaseModel):
@@ -44,5 +43,4 @@ class WalletAdminSummary(WalletBase):
     user_id: int
     active_cashouts: List[WalletTransaction] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
