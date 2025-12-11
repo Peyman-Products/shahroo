@@ -65,7 +65,7 @@ def request_wallet_checkout(
         wallet_id=wallet.id,
         type=TransactionType.payout,
         amount=payload.amount,
-        status=TransactionStatus.in_progress,
+        status=TransactionStatus.requested,
         description=payload.description or "Wallet checkout request",
     )
 
