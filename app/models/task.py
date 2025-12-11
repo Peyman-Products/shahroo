@@ -27,6 +27,7 @@ class Task(Base):
     title = Column(String, index=True)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     category_id = Column(Integer, ForeignKey("task_categories.id"))
     price = Column(Float)
     estimated_time = Column(Integer) # in minutes
@@ -45,7 +46,8 @@ class Task(Base):
     lng = Column(Float)
 
     business = relationship("Business")
-    assigned_user = relationship("User")
+    assigned_user = relationship("User", foreign_keys=[assigned_user_id])
+    created_by_admin = relationship("User", foreign_keys=[created_by_admin_id])
     steps = relationship("TaskStep", back_populates="task")
     category = relationship("TaskCategory", back_populates="tasks")
     tags = relationship("TaskTag", secondary=task_tag_link, back_populates="tasks")

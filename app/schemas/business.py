@@ -3,7 +3,6 @@ from typing import Optional
 
 class BusinessBase(BaseModel):
     name: str
-    contact_person: Optional[str] = None
     phone_number: Optional[str] = None
     address: Optional[str] = None
 
@@ -15,7 +14,7 @@ class BusinessUpdate(BusinessBase):
 
 class Business(BusinessBase):
     id: int
-    status: str
+    status: bool
     created_by_admin_id: int
 
     class Config:
