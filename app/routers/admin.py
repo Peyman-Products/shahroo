@@ -5,8 +5,9 @@ from app.db import get_db
 from app.schemas.user import User as UserSchema
 from app.models.user import User, VerificationStatus
 from app.utils.deps import get_current_user, user_has_permission
-from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate
+from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
 from app.models.task import Task, TaskStep, TaskStatus
+from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
 from app.routers.wallet import get_or_create_wallet
 from datetime import datetime, timezone
@@ -38,6 +39,25 @@ def update_user_verification(user_id: int, status: VerificationStatus, db: Sessi
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@router.get("/task-kinds", response_model=List[TaskKindSchema], summary="Get all task kinds")
+def list_task_kinds(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """Retrieves available task kinds for use in task creation."""
+    return db.query(TaskKind).offset(skip).limit(limit).all()
+
+
+@router.post("/task-kinds", response_model=TaskKindSchema, summary="Create a new task kind")
+def create_task_kind(kind: TaskKindCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """Creates a new task kind to categorize tasks from the admin panel."""
+    existing = db.query(TaskKind).filter(TaskKind.name == kind.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Task kind with this name already exists")
+    db_kind = TaskKind(**kind.dict())
+    db.add(db_kind)
+    db.commit()
+    db.refresh(db_kind)
+    return db_kind
 
 @router.post("/tasks", response_model=TaskSchema, summary="Create a new task", dependencies=[Depends(user_has_permission("create_task"))])
 def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
