@@ -14,6 +14,16 @@ class TaskCategory(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     tasks = relationship("Task", back_populates="category")
 
+
+class TaskKind(Base):
+    __tablename__ = "task_kinds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+
+    tasks = relationship("Task", back_populates="kind")
+
 class TaskTag(Base):
     __tablename__ = "task_tags"
     id = Column(Integer, primary_key=True, index=True)
