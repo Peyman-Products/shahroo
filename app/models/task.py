@@ -48,7 +48,7 @@ class Task(Base):
     lng = Column(Float)
 
     business = relationship("Business")
-    assigned_user = relationship("User")
+    assigned_user = relationship("User", foreign_keys=[assigned_user_id])
     created_by_admin = relationship("User", foreign_keys=[created_by_admin_id])
     steps = relationship("TaskStep", back_populates="task")
     category = relationship("TaskCategory", back_populates="tasks")
