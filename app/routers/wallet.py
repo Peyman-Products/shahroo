@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db import get_db
+from sqlalchemy.exc import IntegrityError
+
 from app.schemas.wallet import Wallet as WalletSchema
 from app.schemas.wallet import WalletCheckoutRequest, WalletTransaction as WalletTransactionSchema
 from app.models.wallet import Wallet
@@ -16,8 +18,13 @@ def get_or_create_wallet(db: Session, user_id: int) -> Wallet:
     if not wallet:
         wallet = Wallet(user_id=user_id)
         db.add(wallet)
-        db.commit()
-        db.refresh(wallet)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            wallet = db.query(Wallet).filter(Wallet.user_id == user_id).one()
+        else:
+            db.refresh(wallet)
     return wallet
 
 from app.models.wallet import TransactionStatus, TransactionType, WalletTransaction
