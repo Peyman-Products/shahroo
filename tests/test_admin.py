@@ -4,9 +4,12 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db import Base, get_db
 from app.models.user import User
+from app.models.permission import Role
 from app.utils.token import create_access_token
 from app.models.business import Business
 from app.models.task import Task
+from app.models.otp import OTP
+from datetime import datetime, timedelta, timezone
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
@@ -28,10 +31,22 @@ client = TestClient(app)
 
 def get_admin_token():
     db = TestingSessionLocal()
-    admin = User(phone_number="+15555555558", role="admin")
-    db.add(admin)
-    db.commit()
-    access_token = create_access_token(data={"sub": str(admin.id), "role": admin.role})
+    admin_role = db.query(Role).filter(Role.name == "admin").first()
+    if not admin_role:
+        admin_role = Role(name="admin")
+        db.add(admin_role)
+        db.commit()
+        db.refresh(admin_role)
+
+    admin = db.query(User).filter(User.phone_number == "+15555555558").first()
+    if not admin:
+        admin = User(phone_number="+15555555558", role=admin_role)
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+
+    access_token = create_access_token(data={"sub": str(admin.id), "role": admin.role.name})
+    db.close()
     return access_token
 
 def test_get_users():
@@ -67,3 +82,35 @@ def test_approve_task():
     response = client.post(f"/admin/tasks/{task.id}/approve", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json()["status"] == "approved"
+
+
+def test_admin_can_lookup_existing_otp():
+    token = get_admin_token()
+    db = TestingSessionLocal()
+    otp_code = "654321"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+    db_otp = OTP(phone_number="+15555555563", otp_code=otp_code, expires_at=expires_at)
+    db.add(db_otp)
+    db.commit()
+
+    response = client.get(
+        "/admin/otp",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"phone_number": "+15555555563"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["otp_code"] == otp_code
+    assert response.json()["phone_number"] == "+15555555563"
+
+
+def test_admin_lookup_returns_not_found_for_invalid_otp():
+    token = get_admin_token()
+    response = client.get(
+        "/admin/otp",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"phone_number": "+15555555564"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "No valid OTP found"}
