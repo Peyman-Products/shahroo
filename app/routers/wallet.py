@@ -5,6 +5,7 @@ from app.schemas.wallet import Wallet as WalletSchema
 from app.models.wallet import Wallet
 from app.models.user import User
 from app.utils.deps import get_current_user
+from app.utils.wallet import refresh_wallet_balance
 
 router = APIRouter()
 
@@ -27,6 +28,7 @@ def read_user_wallet(db: Session = Depends(get_db), current_user: User = Depends
     Retrieves the wallet of the currently authenticated user.
     """
     wallet = get_or_create_wallet(db, current_user.id)
+    refresh_wallet_balance(db, wallet)
     return wallet
 
 @router.get("/me/transactions", response_model=List[WalletTransactionSchema], summary="Get current user's wallet transactions")
@@ -35,5 +37,6 @@ def read_user_wallet_transactions(skip: int = 0, limit: int = 100, db: Session =
     Retrieves the wallet transactions of the currently authenticated user.
     """
     wallet = get_or_create_wallet(db, current_user.id)
+    refresh_wallet_balance(db, wallet)
     transactions = db.query(WalletTransaction).filter(WalletTransaction.wallet_id == wallet.id).offset(skip).limit(limit).all()
     return transactions

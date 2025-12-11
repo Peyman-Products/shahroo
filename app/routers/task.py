@@ -18,6 +18,23 @@ def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     tasks = db.query(Task).offset(skip).limit(limit).all()
     return tasks
 
+@router.get("/me/ongoing", response_model=List[TaskSchema], summary="Get current user's ongoing tasks")
+def read_ongoing_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Retrieves tasks assigned to the current user that are in progress or awaiting approval.
+    """
+    tasks = (
+        db.query(Task)
+        .filter(
+            Task.assigned_user_id == current_user.id,
+            Task.status.in_([TaskStatus.in_progress, TaskStatus.done]),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return tasks
+
 @router.get("/{task_id}", response_model=TaskSchema, summary="Get a specific task")
 def read_task(task_id: int, db: Session = Depends(get_db)):
     """

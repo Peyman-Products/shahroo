@@ -10,6 +10,7 @@ from app.models.task import Task, TaskStep, TaskStatus, StepStatus
 from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
 from app.routers.wallet import get_or_create_wallet
+from app.utils.wallet import refresh_wallet_balance
 from datetime import datetime, timezone
 from app.schemas.otp import OTPAdminLookup, OTPAdminLookupResponse
 from app.utils.otp import get_valid_otp
@@ -188,6 +189,20 @@ def approve_task(task_id: int, db: Session = Depends(get_db), current_user: User
 
     wallet = get_or_create_wallet(db, db_task.assigned_user_id)
 
+    existing_transaction = (
+        db.query(WalletTransaction)
+        .filter(
+            WalletTransaction.wallet_id == wallet.id,
+            WalletTransaction.related_task_id == db_task.id,
+            WalletTransaction.type == TransactionType.earning,
+            WalletTransaction.status == TransactionStatus.confirmed,
+        )
+        .first()
+    )
+
+    if existing_transaction:
+        raise HTTPException(status_code=400, detail="Task earning already processed")
+
     transaction = WalletTransaction(
         wallet_id=wallet.id,
         type=TransactionType.earning,
@@ -198,12 +213,14 @@ def approve_task(task_id: int, db: Session = Depends(get_db), current_user: User
     )
     db.add(transaction)
 
-    wallet.balance += db_task.price
-
     db_task.status = TaskStatus.approved
     db_task.approved_at = datetime.now(timezone.utc)
 
+    db.flush()
+    refresh_wallet_balance(db, wallet, commit=False)
     db.commit()
+
     db.refresh(db_task)
+    db.refresh(wallet)
 
     return db_task
