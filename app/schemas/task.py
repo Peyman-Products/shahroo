@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from app.models.task import TaskStatus, StepStatus
+from app.schemas.user import User as UserSchema
 
 
 class TaskKindBase(BaseModel):
@@ -87,6 +88,7 @@ class Task(TaskBase):
     assigned_user_id: Optional[int] = None
     task_kind_id: Optional[int] = None
     status: TaskStatus
+    assigned_user: Optional[UserSchema] = None
     steps: List[TaskStep] = Field(default_factory=list)
     kind: Optional[TaskKind] = None
     accepted_at: Optional[datetime] = None
