@@ -30,6 +30,9 @@ class UserRole(BaseModel):
     user_id: int
     role_id: int
 
+class UserRoleUpdate(BaseModel):
+    role_id: int
+
 class RolePermission(BaseModel):
     role_id: int
     permission_id: int
