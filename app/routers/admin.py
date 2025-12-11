@@ -10,7 +10,7 @@ from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, Tas
 from app.models.task import Task, TaskStep, TaskStatus, StepStatus
 from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
-from app.schemas.wallet import WalletTransaction as WalletTransactionSchema
+from app.schemas.wallet import WalletAdminSummary, WalletTransaction as WalletTransactionSchema
 from app.routers.wallet import get_or_create_wallet
 from app.utils.wallet import refresh_wallet_balance
 from datetime import datetime, timezone
@@ -228,6 +228,36 @@ def approve_task(task_id: int, db: Session = Depends(get_db), current_user: User
     return db_task
 
 
+# Wallet cashout management
+
+
+@router.get("/wallets", response_model=List[WalletAdminSummary], summary="List wallets with cashout info")
+def list_wallets(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """Return wallets along with balances and active cashout requests."""
+
+    wallets = db.query(Wallet).offset(skip).limit(limit).all()
+
+    summaries: List[WalletAdminSummary] = []
+    for wallet in wallets:
+        refresh_wallet_balance(db, wallet, commit=False)
+        active_cashouts = [
+            tx
+            for tx in wallet.transactions
+            if tx.type == TransactionType.payout
+            and tx.status in {TransactionStatus.in_progress, TransactionStatus.sent_to_bank}
+        ]
+        summaries.append(
+            WalletAdminSummary(
+                id=wallet.id,
+                user_id=wallet.user_id,
+                balance=wallet.balance,
+                active_cashouts=active_cashouts,
+            )
+        )
+
+    return summaries
+
+
 @router.get("/wallets/checkout-requests", response_model=List[WalletTransactionSchema], summary="List wallet checkout requests")
 def list_checkout_requests(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """
@@ -238,7 +268,7 @@ def list_checkout_requests(skip: int = 0, limit: int = 100, db: Session = Depend
         db.query(WalletTransaction)
         .filter(
             WalletTransaction.type == TransactionType.payout,
-            WalletTransaction.status == TransactionStatus.requested,
+            WalletTransaction.status.in_([TransactionStatus.in_progress, TransactionStatus.sent_to_bank]),
         )
         .offset(skip)
         .limit(limit)
@@ -253,9 +283,7 @@ def list_checkout_requests(skip: int = 0, limit: int = 100, db: Session = Depend
 )
 def approve_checkout_request(transaction_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """
-    Confirm a payout request and apply it to the user's wallet balance. The payout
-    must still be covered by the confirmed balance after accounting for other
-    pending or requested payouts.
+    Approve a payout request and move it forward to bank processing.
     """
 
     transaction = (
@@ -270,29 +298,84 @@ def approve_checkout_request(transaction_id: int, db: Session = Depends(get_db),
     if transaction.type != TransactionType.payout:
         raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    if transaction.status not in {TransactionStatus.requested, TransactionStatus.pending}:
+    if transaction.status != TransactionStatus.in_progress:
         raise HTTPException(status_code=400, detail="Transaction is not awaiting approval")
 
     wallet = transaction.wallet or get_or_create_wallet(db, transaction.wallet_id)
     refresh_wallet_balance(db, wallet)
 
-    reserved_amount = (
-        db.query(func.coalesce(func.sum(WalletTransaction.amount), 0))
-        .filter(
-            WalletTransaction.wallet_id == wallet.id,
-            WalletTransaction.type == TransactionType.payout,
-            WalletTransaction.status.in_([TransactionStatus.requested, TransactionStatus.pending]),
-            WalletTransaction.id != transaction.id,
-        )
-        .scalar()
+    transaction.status = TransactionStatus.sent_to_bank
+
+    db.flush()
+    refresh_wallet_balance(db, wallet, commit=False)
+    db.commit()
+    db.refresh(transaction)
+    db.refresh(wallet)
+
+    return transaction
+
+
+@router.post(
+    "/wallets/checkout-requests/{transaction_id}/complete",
+    response_model=WalletTransactionSchema,
+    summary="Mark a wallet checkout as paid by the bank",
+)
+def complete_checkout_request(transaction_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """Finalize a payout after the bank confirms payment."""
+
+    transaction = (
+        db.query(WalletTransaction)
+        .filter(WalletTransaction.id == transaction_id)
+        .first()
     )
 
-    available_balance = wallet.balance - reserved_amount
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Checkout request not found")
 
-    if transaction.amount > available_balance:
-        raise HTTPException(status_code=400, detail="Insufficient available balance to approve checkout")
+    if transaction.type != TransactionType.payout:
+        raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    transaction.status = TransactionStatus.confirmed
+    if transaction.status != TransactionStatus.sent_to_bank:
+        raise HTTPException(status_code=400, detail="Transaction is not awaiting bank confirmation")
+
+    transaction.status = TransactionStatus.paid
+
+    wallet = transaction.wallet or get_or_create_wallet(db, transaction.wallet_id)
+
+    db.flush()
+    refresh_wallet_balance(db, wallet, commit=False)
+    db.commit()
+    db.refresh(transaction)
+    db.refresh(wallet)
+
+    return transaction
+
+
+@router.post(
+    "/wallets/checkout-requests/{transaction_id}/deny",
+    response_model=WalletTransactionSchema,
+    summary="Deny a wallet checkout request",
+)
+def deny_checkout_request(transaction_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """Reject a payout request and return the funds to the user's wallet."""
+
+    transaction = (
+        db.query(WalletTransaction)
+        .filter(WalletTransaction.id == transaction_id)
+        .first()
+    )
+
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Checkout request not found")
+
+    if transaction.type != TransactionType.payout:
+        raise HTTPException(status_code=400, detail="Transaction is not a payout request")
+
+    if transaction.status not in {TransactionStatus.in_progress, TransactionStatus.sent_to_bank}:
+        raise HTTPException(status_code=400, detail="Transaction is not eligible for denial")
+
+    transaction.status = TransactionStatus.denied
+    wallet = transaction.wallet or get_or_create_wallet(db, transaction.wallet_id)
 
     db.flush()
     refresh_wallet_balance(db, wallet, commit=False)

@@ -10,11 +10,18 @@ def refresh_wallet_balance(db: Session, wallet: Wallet, commit: bool = True) -> 
     relational transaction data so changes can be reversed by updating transactions.
     """
 
+    confirmed_like_statuses = {
+        TransactionStatus.confirmed,
+        TransactionStatus.in_progress,
+        TransactionStatus.sent_to_bank,
+        TransactionStatus.paid,
+    }
+
     transactions = (
         db.query(WalletTransaction)
         .filter(
             WalletTransaction.wallet_id == wallet.id,
-            WalletTransaction.status == TransactionStatus.confirmed,
+            WalletTransaction.status.in_(confirmed_like_statuses),
         )
         .all()
     )
