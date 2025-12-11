@@ -20,6 +20,21 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user
 
+
+def is_profile_complete(user: User) -> bool:
+    required_fields = [
+        user.first_name,
+        user.last_name,
+        user.birthdate,
+        user.sex,
+        user.national_id,
+        user.address,
+        user.id_card_image,
+        user.selfie_image,
+    ]
+    return all(required_fields)
+
+
 @router.post("/send-otp", summary="Send OTP to user")
 def send_otp(otp_send: OTPSend, db: Session = Depends(get_db)):
     """
@@ -46,7 +61,13 @@ def verify_otp(otp_verify: OTPVerify, db: Session = Depends(get_db)):
 
     role_name = user.role.name if user.role else "user"
     access_token = create_access_token(data={"sub": str(user.id), "role": role_name, "is_verified": user.verification_status == VerificationStatus.verified})
-    return {"access_token": access_token, "token_type": "bearer"}
+    user_schema = UserSchema.model_validate(user)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_schema.model_dump(),
+        "new_user": not is_profile_complete(user),
+    }
 
 
 @router.get("/lookup-otp", response_model=OTPAdminLookupResponse, summary="Lookup OTP for a phone number")
