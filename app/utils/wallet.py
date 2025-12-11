@@ -11,6 +11,7 @@ def refresh_wallet_balance(db: Session, wallet: Wallet, commit: bool = True) -> 
     """
 
     confirmed_like_statuses = {
+        TransactionStatus.requested,
         TransactionStatus.confirmed,
         TransactionStatus.in_progress,
         TransactionStatus.sent_to_bank,

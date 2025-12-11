@@ -268,7 +268,9 @@ def list_checkout_requests(skip: int = 0, limit: int = 100, db: Session = Depend
         db.query(WalletTransaction)
         .filter(
             WalletTransaction.type == TransactionType.payout,
-            WalletTransaction.status.in_([TransactionStatus.in_progress, TransactionStatus.sent_to_bank]),
+            WalletTransaction.status.in_(
+                [TransactionStatus.requested, TransactionStatus.sent_to_bank]
+            ),
         )
         .offset(skip)
         .limit(limit)
@@ -298,7 +300,7 @@ def approve_checkout_request(transaction_id: int, db: Session = Depends(get_db),
     if transaction.type != TransactionType.payout:
         raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    if transaction.status != TransactionStatus.in_progress:
+    if transaction.status != TransactionStatus.requested:
         raise HTTPException(status_code=400, detail="Transaction is not awaiting approval")
 
     wallet = transaction.wallet or get_or_create_wallet(db, transaction.wallet_id)
@@ -335,7 +337,7 @@ def complete_checkout_request(transaction_id: int, db: Session = Depends(get_db)
     if transaction.type != TransactionType.payout:
         raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    if transaction.status not in {TransactionStatus.sent_to_bank, TransactionStatus.in_progress}:
+    if transaction.status != TransactionStatus.sent_to_bank:
         raise HTTPException(status_code=400, detail="Transaction is not awaiting bank confirmation")
 
     transaction.status = TransactionStatus.paid
@@ -371,7 +373,7 @@ def deny_checkout_request(transaction_id: int, db: Session = Depends(get_db), cu
     if transaction.type != TransactionType.payout:
         raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    if transaction.status not in {TransactionStatus.in_progress, TransactionStatus.sent_to_bank}:
+    if transaction.status not in {TransactionStatus.requested, TransactionStatus.sent_to_bank}:
         raise HTTPException(status_code=400, detail="Transaction is not eligible for denial")
 
     transaction.status = TransactionStatus.denied
