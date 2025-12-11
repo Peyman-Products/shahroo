@@ -39,7 +39,10 @@ def test_verify_otp():
 
     response = client.post("/auth/verify-otp", json={"phone_number": "+15555555555", "otp_code": "123456"})
     assert response.status_code == 200
-    assert "access_token" in response.json()
+    data = response.json()
+    assert "access_token" in data
+    assert data["new_user"] is True
+    assert data["user"]["phone_number"] == "+15555555555"
 
 def test_verify_otp_invalid():
     response = client.post("/auth/verify-otp", json={"phone_number": "+15555555555", "otp_code": "654321"})
