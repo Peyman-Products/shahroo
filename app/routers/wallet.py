@@ -58,31 +58,21 @@ def request_wallet_checkout(
     wallet = get_or_create_wallet(db, current_user.id)
     refresh_wallet_balance(db, wallet)
 
-    reserved_amount = (
-        db.query(func.coalesce(func.sum(WalletTransaction.amount), 0))
-        .filter(
-            WalletTransaction.wallet_id == wallet.id,
-            WalletTransaction.type == TransactionType.payout,
-            WalletTransaction.status.in_([TransactionStatus.requested, TransactionStatus.pending]),
-        )
-        .scalar()
-    )
-
-    available_balance = wallet.balance - reserved_amount
-
-    if payload.amount > available_balance:
+    if payload.amount > wallet.balance:
         raise HTTPException(status_code=400, detail="Insufficient available balance for checkout request")
 
     transaction = WalletTransaction(
         wallet_id=wallet.id,
         type=TransactionType.payout,
         amount=payload.amount,
-        status=TransactionStatus.requested,
+        status=TransactionStatus.in_progress,
         description=payload.description or "Wallet checkout request",
     )
 
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+
+    refresh_wallet_balance(db, wallet)
 
     return transaction

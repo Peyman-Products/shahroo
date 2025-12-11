@@ -37,3 +37,12 @@ class Wallet(WalletBase):
 class WalletCheckoutRequest(BaseModel):
     amount: float = Field(..., gt=0)
     description: Optional[str] = None
+
+
+class WalletAdminSummary(WalletBase):
+    id: int
+    user_id: int
+    active_cashouts: List[WalletTransaction] = []
+
+    class Config:
+        orm_mode = True

@@ -13,6 +13,10 @@ class TransactionStatus(enum.Enum):
     pending = "pending"
     confirmed = "confirmed"
     canceled = "canceled"
+    in_progress = "in_progress"
+    sent_to_bank = "sent_to_bank"
+    paid = "paid"
+    denied = "denied"
 
 class Wallet(Base):
     __tablename__ = "wallets"
