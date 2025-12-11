@@ -17,9 +17,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add new enum values if they don't already exist
-    for value in ('issued', 'canceled', 'failed'):
-        op.execute(sa.text("""ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS :value""").bindparams(value=value))
+    # Add new enum values if they don't already exist. Postgres requires new enum
+    # values to be committed before they can be used in the same migration, so we
+    # run these statements in an autocommit block.
+    with op.get_context().autocommit_block():
+        for value in ('issued', 'canceled', 'failed'):
+            op.execute(
+                sa.text(
+                    """ALTER TYPE taskstatus ADD VALUE IF NOT EXISTS :value"""
+                ).bindparams(value=value)
+            )
 
     # Ensure tasks without a status default to the issued state
     op.execute(sa.text("UPDATE tasks SET status = 'issued' WHERE status IS NULL"))

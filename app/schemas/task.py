@@ -25,6 +25,8 @@ class TaskStepBase(BaseModel):
     address: str = Field(..., example="456 Oak Ave")
     lat: Optional[float] = Field(None, example=51.5074)
     lng: Optional[float] = Field(None, example=-0.1278)
+    estimated_time: Optional[int] = Field(None, example=30)
+    start_time: Optional[datetime] = Field(None, example="2025-01-01T12:30:00Z")
     order: int = Field(..., example=1)
 
 class TaskStepCreate(TaskStepBase):
@@ -36,6 +38,8 @@ class TaskStepUpdate(BaseModel):
     address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    estimated_time: Optional[int] = None
+    start_time: Optional[datetime] = None
     status: Optional[StepStatus] = None
     order: Optional[int] = None
 
