@@ -335,7 +335,7 @@ def complete_checkout_request(transaction_id: int, db: Session = Depends(get_db)
     if transaction.type != TransactionType.payout:
         raise HTTPException(status_code=400, detail="Transaction is not a payout request")
 
-    if transaction.status != TransactionStatus.sent_to_bank:
+    if transaction.status not in {TransactionStatus.sent_to_bank, TransactionStatus.in_progress}:
         raise HTTPException(status_code=400, detail="Transaction is not awaiting bank confirmation")
 
     transaction.status = TransactionStatus.paid
