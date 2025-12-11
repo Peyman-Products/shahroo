@@ -3,7 +3,6 @@ from typing import Optional
 
 class BusinessBase(BaseModel):
     name: str
-    contact_person: Optional[str] = None
     phone_number: Optional[str] = None
     address: Optional[str] = None
 

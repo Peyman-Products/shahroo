@@ -7,7 +7,6 @@ class Business(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    contact_person = Column(String)
     phone_number = Column(String)
     address = Column(String)
     status = Column(Boolean, default=True, server_default="true", nullable=False)

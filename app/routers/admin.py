@@ -44,11 +44,12 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: U
     """
     Creates a new task. Only accessible by admin users with the 'create_task' permission.
     """
-    db_task = Task(**task.dict(exclude={"steps"}), created_by_admin_id=current_user.id)
+    db_task = Task(**task.model_dump(exclude={"steps"}))
+    db_task.created_by_admin_id = current_user.id
     db.add(db_task)
     db.commit()
     for step_data in task.steps:
-        db_step = TaskStep(**step_data.dict(), task_id=db_task.id)
+        db_step = TaskStep(**step_data.model_dump(), task_id=db_task.id)
         db.add(db_step)
     db.commit()
     db.refresh(db_task)
@@ -62,7 +63,7 @@ def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db), c
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if db_task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    for field, value in task.dict(exclude_unset=True).items():
+    for field, value in task.model_dump(exclude_unset=True).items():
         setattr(db_task, field, value)
     db.commit()
     db.refresh(db_task)
