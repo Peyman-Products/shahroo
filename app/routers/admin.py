@@ -11,6 +11,8 @@ from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
 from app.routers.wallet import get_or_create_wallet
 from datetime import datetime, timezone
+from app.schemas.otp import OTPAdminLookup, OTPAdminLookupResponse
+from app.utils.otp import get_valid_otp
 
 router = APIRouter()
 
@@ -18,6 +20,18 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
     if not current_user.role or current_user.role.name not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user
+
+
+@router.get("/otp", response_model=OTPAdminLookupResponse, summary="Lookup OTP for a phone number")
+def lookup_otp(query: OTPAdminLookup = Depends(), db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    db_otp = get_valid_otp(db, query.phone_number)
+    if not db_otp:
+        raise HTTPException(status_code=404, detail="No valid OTP found")
+    return {
+        "phone_number": db_otp.phone_number,
+        "otp_code": db_otp.otp_code,
+        "expires_at": db_otp.expires_at,
+    }
 
 @router.get("/users", response_model=List[UserSchema], summary="Get all users")
 def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):

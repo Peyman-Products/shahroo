@@ -47,3 +47,11 @@ def verify_otp(db: Session, phone_number: str, otp_code: str):
         db.commit()
         return True
     return False
+
+
+def get_valid_otp(db: Session, phone_number: str):
+    return db.query(OTP).filter(
+        OTP.phone_number == phone_number,
+        OTP.used == False,
+        OTP.expires_at > datetime.now(timezone.utc)
+    ).order_by(OTP.expires_at.desc()).first()
