@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from typing import List
 from app.db import get_db
 from app.schemas.user import User as UserSchema
 from app.models.user import User, VerificationStatus
 from app.utils.deps import get_current_user, user_has_permission
-from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
-from app.models.task import Task, TaskStep, TaskStatus
+from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, TaskStepUpdate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
+from app.models.task import Task, TaskStep, TaskStatus, StepStatus
 from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
 from app.routers.wallet import get_or_create_wallet
@@ -87,6 +87,75 @@ def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db), c
     db.commit()
     db.refresh(db_task)
     return db_task
+
+
+@router.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
+def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Deletes a specific task along with its steps. Only accessible by admin users.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db.query(TaskStep).filter(TaskStep.task_id == task_id).delete(synchronize_session=False)
+    db.delete(db_task)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/tasks/{task_id}/steps", response_model=TaskSchema, summary="Add a step to a task")
+def add_task_step(task_id: int, step: TaskStepCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Adds a new step to a task. Only accessible by admin users.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db_step = TaskStep(**step.dict(), task_id=task_id)
+    db.add(db_step)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+
+@router.patch("/tasks/{task_id}/steps/{step_id}", response_model=TaskSchema, summary="Update a task step")
+def update_task_step(task_id: int, step_id: int, step: TaskStepUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Updates a specific task step. Only accessible by admin users.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db_step = db.query(TaskStep).filter(TaskStep.id == step_id, TaskStep.task_id == task_id).first()
+    if db_step is None:
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    for field, value in step.dict(exclude_unset=True).items():
+        setattr(db_step, field, value)
+
+    if db_step.status == StepStatus.done and db_step.done_at is None:
+        db_step.done_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+
+@router.delete("/tasks/{task_id}/steps/{step_id}", status_code=204, summary="Delete a task step")
+def delete_task_step(task_id: int, step_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Deletes a specific step from a task. Only accessible by admin users.
+    """
+    db_step = db.query(TaskStep).filter(TaskStep.id == step_id, TaskStep.task_id == task_id).first()
+    if db_step is None:
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    db.delete(db_step)
+    db.commit()
+    return Response(status_code=204)
 
 @router.post("/tasks/{task_id}/approve", response_model=TaskSchema, summary="Approve a completed task")
 def approve_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
