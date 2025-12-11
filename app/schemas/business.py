@@ -11,11 +11,11 @@ class BusinessCreate(BusinessBase):
     pass
 
 class BusinessUpdate(BusinessBase):
-    status: Optional[str] = None
+    status: Optional[bool] = None
 
 class Business(BusinessBase):
     id: int
-    status: str
+    status: bool
     created_by_admin_id: int
 
     class Config:
