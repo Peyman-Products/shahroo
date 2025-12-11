@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, ForeignKey, Float, Enum
 from sqlalchemy.orm import relationship
 from app.db import Base
-from app.models.task_meta import task_tag_link
+from app.models.task_meta import task_tag_link, TaskKind
 import enum
 
 class TaskStatus(enum.Enum):
@@ -25,9 +25,12 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
+    description = Column(String)
     business_id = Column(Integer, ForeignKey("businesses.id"))
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     category_id = Column(Integer, ForeignKey("task_categories.id"))
+    task_kind_id = Column(Integer, ForeignKey("task_kinds.id"), nullable=True)
+    created_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     price = Column(Float)
     estimated_time = Column(Integer) # in minutes
     start_datetime = Column(DateTime(timezone=True))
@@ -46,8 +49,10 @@ class Task(Base):
 
     business = relationship("Business")
     assigned_user = relationship("User")
+    created_by_admin = relationship("User", foreign_keys=[created_by_admin_id])
     steps = relationship("TaskStep", back_populates="task")
     category = relationship("TaskCategory", back_populates="tasks")
+    kind = relationship("TaskKind", back_populates="tasks")
     tags = relationship("TaskTag", secondary=task_tag_link, back_populates="tasks")
 
 class TaskStep(Base):
