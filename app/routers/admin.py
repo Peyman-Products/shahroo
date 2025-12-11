@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 from app.db import get_db
@@ -9,6 +10,7 @@ from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, Tas
 from app.models.task import Task, TaskStep, TaskStatus, StepStatus
 from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
+from app.schemas.wallet import WalletTransaction as WalletTransactionSchema
 from app.routers.wallet import get_or_create_wallet
 from app.utils.wallet import refresh_wallet_balance
 from datetime import datetime, timezone
@@ -224,3 +226,78 @@ def approve_task(task_id: int, db: Session = Depends(get_db), current_user: User
     db.refresh(wallet)
 
     return db_task
+
+
+@router.get("/wallets/checkout-requests", response_model=List[WalletTransactionSchema], summary="List wallet checkout requests")
+def list_checkout_requests(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Retrieve payout transactions that are awaiting approval by an admin user.
+    """
+
+    return (
+        db.query(WalletTransaction)
+        .filter(
+            WalletTransaction.type == TransactionType.payout,
+            WalletTransaction.status == TransactionStatus.requested,
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+@router.post(
+    "/wallets/checkout-requests/{transaction_id}/approve",
+    response_model=WalletTransactionSchema,
+    summary="Approve a wallet checkout request",
+)
+def approve_checkout_request(transaction_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Confirm a payout request and apply it to the user's wallet balance. The payout
+    must still be covered by the confirmed balance after accounting for other
+    pending or requested payouts.
+    """
+
+    transaction = (
+        db.query(WalletTransaction)
+        .filter(WalletTransaction.id == transaction_id)
+        .first()
+    )
+
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Checkout request not found")
+
+    if transaction.type != TransactionType.payout:
+        raise HTTPException(status_code=400, detail="Transaction is not a payout request")
+
+    if transaction.status not in {TransactionStatus.requested, TransactionStatus.pending}:
+        raise HTTPException(status_code=400, detail="Transaction is not awaiting approval")
+
+    wallet = transaction.wallet or get_or_create_wallet(db, transaction.wallet_id)
+    refresh_wallet_balance(db, wallet)
+
+    reserved_amount = (
+        db.query(func.coalesce(func.sum(WalletTransaction.amount), 0))
+        .filter(
+            WalletTransaction.wallet_id == wallet.id,
+            WalletTransaction.type == TransactionType.payout,
+            WalletTransaction.status.in_([TransactionStatus.requested, TransactionStatus.pending]),
+            WalletTransaction.id != transaction.id,
+        )
+        .scalar()
+    )
+
+    available_balance = wallet.balance - reserved_amount
+
+    if transaction.amount > available_balance:
+        raise HTTPException(status_code=400, detail="Insufficient available balance to approve checkout")
+
+    transaction.status = TransactionStatus.confirmed
+
+    db.flush()
+    refresh_wallet_balance(db, wallet, commit=False)
+    db.commit()
+    db.refresh(transaction)
+    db.refresh(wallet)
+
+    return transaction

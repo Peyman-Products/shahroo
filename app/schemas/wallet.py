@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import Field
 from typing import Optional, List
 from datetime import datetime
 from app.models.wallet import TransactionType, TransactionStatus
@@ -31,3 +32,8 @@ class Wallet(WalletBase):
 
     class Config:
         orm_mode = True
+
+
+class WalletCheckoutRequest(BaseModel):
+    amount: float = Field(..., gt=0)
+    description: Optional[str] = None

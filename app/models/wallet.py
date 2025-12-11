@@ -9,6 +9,7 @@ class TransactionType(enum.Enum):
     adjustment = "adjustment"
 
 class TransactionStatus(enum.Enum):
+    requested = "requested"
     pending = "pending"
     confirmed = "confirmed"
     canceled = "canceled"
