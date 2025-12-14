@@ -37,6 +37,7 @@ def read_user_wallet(db: Session = Depends(get_db), current_user: User = Depends
     """
     wallet = get_or_create_wallet(db, current_user.id)
     refresh_wallet_balance(db, wallet)
+    wallet.shaba_number = current_user.shaba_number
     return wallet
 
 @router.get("/me/transactions", response_model=List[WalletTransactionSchema], summary="Get current user's wallet transactions")

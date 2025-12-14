@@ -19,6 +19,7 @@ class User(Base):
     birthdate = Column(Date, nullable=True)
     sex = Column(String, nullable=True)
     national_id = Column(String, unique=True, nullable=True)
+    shaba_number = Column(String, unique=True, nullable=True)
     address = Column(String, nullable=True)
     id_card_image = Column(String, nullable=True)
     selfie_image = Column(String, nullable=True)
