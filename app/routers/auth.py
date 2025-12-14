@@ -28,6 +28,7 @@ def is_profile_complete(user: User) -> bool:
         user.birthdate,
         user.sex,
         user.national_id,
+        user.shaba_number,
         user.address,
         user.id_card_image,
         user.selfie_image,

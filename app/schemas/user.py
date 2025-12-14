@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     birthdate: Optional[date] = None
     sex: Optional[str] = None
     national_id: Optional[str] = None
+    shaba_number: Optional[str] = None
     address: Optional[str] = None
 
 class UserCreate(UserBase):
@@ -21,6 +22,7 @@ class UserUpdate(BaseModel):
     birthdate: Optional[date] = Field(None, example="1990-01-01")
     sex: Optional[str] = Field(None, example="Male")
     national_id: Optional[str] = Field(None, example="1234567890")
+    shaba_number: Optional[str] = Field(None, example="IR820540102680020817909002")
     address: Optional[str] = Field(None, example="123 Main St")
 
 from app.schemas.permission import Role
@@ -31,6 +33,7 @@ class User(UserBase):
     selfie_image: Optional[str] = None
     verification_status: VerificationStatus
     role: Optional[Role] = None
+    shaba_number: Optional[str] = None
 
     class Config:
         from_attributes = True

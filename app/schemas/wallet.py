@@ -24,6 +24,7 @@ class WalletTransaction(WalletTransactionBase):
 
 class WalletBase(BaseModel):
     balance: float
+    shaba_number: Optional[str] = None
 
 class Wallet(WalletBase):
     id: int

@@ -251,6 +251,7 @@ def list_wallets(skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
                 id=wallet.id,
                 user_id=wallet.user_id,
                 balance=wallet.balance,
+                shaba_number=wallet.user.shaba_number if wallet.user else None,
                 active_cashouts=active_cashouts,
             )
         )
