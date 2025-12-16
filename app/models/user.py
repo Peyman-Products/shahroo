@@ -44,10 +44,21 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    @property
-    def avatar_url(self):
-        if not self.avatar_image:
+    def _media_url(self, path: str | None) -> str | None:
+        if not path:
             return None
         base = settings.MEDIA_BASE_URL.rstrip("/")
-        normalized_path = str(Path(self.avatar_image)).lstrip("/")
+        normalized_path = str(Path(path)).lstrip("/")
         return f"{base}/{normalized_path}"
+
+    @property
+    def avatar_url(self):
+        return self._media_url(self.avatar_image)
+
+    @property
+    def id_card_url(self):
+        return self._media_url(self.id_card_image)
+
+    @property
+    def selfie_url(self):
+        return self._media_url(self.selfie_image)

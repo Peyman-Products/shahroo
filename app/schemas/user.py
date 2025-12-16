@@ -37,6 +37,8 @@ class User(UserBase):
     role: Optional[Role] = None
     shaba_number: Optional[str] = None
     avatar_url: Optional[str] = None
+    id_card_url: Optional[str] = None
+    selfie_url: Optional[str] = None
     last_decision: Optional[KycDecision] = None
 
     class Config:
