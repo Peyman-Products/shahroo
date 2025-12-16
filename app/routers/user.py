@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.db import get_db
 from app.schemas.user import User as UserSchema, UserUpdate
 from app.models.user import User, VerificationStatus
@@ -23,10 +24,28 @@ def update_user_me(user_in: UserUpdate, db: Session = Depends(get_db), current_u
     """
     Updates the profile of the currently authenticated user.
     """
-    for field, value in user_in.dict(exclude_unset=True).items():
+    updates = user_in.dict(exclude_unset=True)
+
+    unique_fields = {
+        "national_id": "National ID",
+        "shaba_number": "Shaba number",
+    }
+
+    for field, label in unique_fields.items():
+        value = updates.get(field)
+        if value:
+            existing_user = db.query(User).filter(getattr(User, field) == value, User.id != current_user.id).first()
+            if existing_user:
+                raise HTTPException(status_code=400, detail=f"{label} already in use by another user")
+
+    for field, value in updates.items():
         setattr(current_user, field, value)
     db.add(current_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Unique constraint violated while updating profile")
     db.refresh(current_user)
     return current_user
 

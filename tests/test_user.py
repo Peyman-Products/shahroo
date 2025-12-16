@@ -25,13 +25,24 @@ app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
 
-def get_test_user_token():
+def create_or_get_user(phone_number="+15555555557", **kwargs):
     db = TestingSessionLocal()
-    user = User(phone_number="+15555555557")
-    db.add(user)
+    user = db.query(User).filter(User.phone_number == phone_number).first()
+    if not user:
+        user = User(phone_number=phone_number, **kwargs)
+        db.add(user)
+    else:
+        for attr, value in kwargs.items():
+            setattr(user, attr, value)
     db.commit()
+    db.refresh(user)
     access_token = create_access_token(data={"sub": str(user.id)})
-    return access_token
+    db.close()
+    return access_token, user
+
+def get_test_user_token(phone_number="+15555555557", **kwargs):
+    token, _ = create_or_get_user(phone_number, **kwargs)
+    return token
 
 def test_get_user_me():
     token = get_test_user_token()
@@ -45,6 +56,20 @@ def test_update_user_me():
     assert response.status_code == 200
     assert response.json()["first_name"] == "John"
     assert response.json()["last_name"] == "Doe"
+
+def test_update_user_me_duplicate_shaba_number():
+    existing_shaba = "IR123456789123456789123456"
+    _, existing_user = create_or_get_user(phone_number="+16666666666", shaba_number=existing_shaba)
+    token = get_test_user_token(phone_number="+17777777777")
+
+    response = client.patch(
+        "/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"shaba_number": existing_user.shaba_number},
+    )
+
+    assert response.status_code == 400
+    assert "Shaba number" in response.json()["detail"]
 
 import io
 
