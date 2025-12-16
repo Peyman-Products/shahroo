@@ -1,10 +1,9 @@
-import hashlib
 import uuid
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
-from sqlalchemy.orm import Session
+
 from app.core.config import settings
-from app.models.media import MediaFile, MediaType
+from app.models.media import MediaType
 
 
 class MediaManager:
@@ -34,13 +33,11 @@ class MediaManager:
 
     def save_user_media(
         self,
-        db: Session,
         *,
         user_id: int,
         media_type: MediaType,
         upload_file: UploadFile,
-        kyc_attempt_id: int | None = None,
-    ) -> MediaFile:
+    ) -> str:
         self._validate_upload(upload_file)
 
         target_folder = self._folder_for(user_id, media_type)
@@ -48,14 +45,12 @@ class MediaManager:
 
         file_suffix = Path(upload_file.filename).suffix or ""
         filename = f"{uuid.uuid4()}{file_suffix}"
-        relative_path = (target_folder / filename).relative_to(self.base_path)
-        absolute_path = self.base_path / relative_path
+        absolute_path = target_folder / filename
 
         content = upload_file.file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-        checksum = hashlib.sha256(content).hexdigest()
         size_bytes = len(content)
         self._validate_file_size(size_bytes)
 
@@ -64,22 +59,12 @@ class MediaManager:
 
         upload_file.file.seek(0)
 
-        db.query(MediaFile).filter(
-            MediaFile.owner_user_id == user_id,
-            MediaFile.type == media_type,
-            MediaFile.is_active == True,
-        ).update({"is_active": False})
+        return str(absolute_path.relative_to(self.base_path)).replace("\\", "/")
 
-        media = MediaFile(
-            owner_user_id=user_id,
-            type=media_type,
-            file_path=str(relative_path).replace("\\", "/"),
-            mime_type=upload_file.content_type,
-            size_bytes=size_bytes,
-            checksum=checksum,
-            kyc_attempt_id=kyc_attempt_id,
-            is_active=True,
-        )
-        db.add(media)
-        db.flush()
-        return media
+    @staticmethod
+    def url_for(relative_path: str | None) -> str | None:
+        if not relative_path:
+            return None
+        base = settings.MEDIA_BASE_URL.rstrip("/")
+        normalized_path = relative_path.lstrip("/")
+        return f"{base}/{normalized_path}"

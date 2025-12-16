@@ -46,7 +46,7 @@ def _ensure_can_upload_kyc(user: User):
 
 
 def _maybe_mark_pending(user: User, attempt: KycAttempt):
-    if user.active_id_card_media_id and user.active_selfie_media_id:
+    if user.id_card_image and user.selfie_image:
         attempt.status = VerificationStatus.pending
         attempt.submitted_at = datetime.now(timezone.utc)
         user.verification_status = VerificationStatus.pending
@@ -123,19 +123,15 @@ def upload_id_card(file: UploadFile = File(...), db: Session = Depends(get_db), 
     _ensure_can_upload_kyc(current_user)
     attempt = _get_or_create_attempt(db, current_user)
 
-    media = media_manager.save_user_media(
-        db,
+    path = media_manager.save_user_media(
         user_id=current_user.id,
         media_type=MediaType.id_card,
         upload_file=file,
-        kyc_attempt_id=attempt.id,
     )
-    current_user.active_id_card_media_id = media.id
-    current_user.id_card_image = None
+    current_user.id_card_image = path
     _maybe_mark_pending(current_user, attempt)
     db.commit()
-    db.refresh(media)
-    return MediaUploadResponse(status="uploaded", upload_id=media.id)
+    return MediaUploadResponse(status="uploaded", file_name=path)
 
 
 @router.post("/me/kyc/selfie", response_model=MediaUploadResponse, summary="Upload selfie image")
@@ -146,33 +142,27 @@ def upload_selfie(file: UploadFile = File(...), db: Session = Depends(get_db), c
     _ensure_can_upload_kyc(current_user)
     attempt = _get_or_create_attempt(db, current_user)
 
-    media = media_manager.save_user_media(
-        db,
+    path = media_manager.save_user_media(
         user_id=current_user.id,
         media_type=MediaType.selfie,
         upload_file=file,
-        kyc_attempt_id=attempt.id,
     )
-    current_user.active_selfie_media_id = media.id
-    current_user.selfie_image = None
+    current_user.selfie_image = path
     _maybe_mark_pending(current_user, attempt)
     db.commit()
-    db.refresh(media)
-    return MediaUploadResponse(status="uploaded", upload_id=media.id)
+    return MediaUploadResponse(status="uploaded", file_name=path)
 
 
 @router.post("/me/avatar", response_model=MediaUploadResponse, summary="Upload avatar image")
 def upload_avatar(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    media = media_manager.save_user_media(
-        db,
+    path = media_manager.save_user_media(
         user_id=current_user.id,
         media_type=MediaType.avatar,
         upload_file=file,
     )
-    current_user.avatar_media_id = media.id
+    current_user.avatar_image = path
     db.commit()
-    db.refresh(media)
-    return MediaUploadResponse(status="uploaded", upload_id=media.id, url=media.url)
+    return MediaUploadResponse(status="uploaded", file_name=path, url=media_manager.url_for(path))
 
 
 @router.get("/me/kyc/status", response_model=KycStatusResponse, summary="Get KYC status summary")

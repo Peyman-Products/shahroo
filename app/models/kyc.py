@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, func, Enum, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
+
 from app.db import Base
 from app.models.user import VerificationStatus
 
@@ -19,4 +20,3 @@ class KycAttempt(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="kyc_attempts", foreign_keys=[user_id])
-    media_files = relationship("MediaFile", back_populates="kyc_attempt")
