@@ -34,7 +34,11 @@ class User(Base):
     kyc_last_decided_at = Column(DateTime(timezone=True), nullable=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
     role = relationship("Role")
-    media_files = relationship("MediaFile", back_populates="owner_user")
+    media_files = relationship(
+        "MediaFile",
+        back_populates="owner_user",
+        foreign_keys="MediaFile.owner_user_id",
+    )
     avatar_media = relationship("MediaFile", foreign_keys=[avatar_media_id])
     id_card_media = relationship("MediaFile", foreign_keys=[active_id_card_media_id])
     selfie_media = relationship("MediaFile", foreign_keys=[active_selfie_media_id])
