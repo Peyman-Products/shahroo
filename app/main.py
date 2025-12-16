@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.db import Base, engine
-from app.routers import auth, user, task, wallet, admin, permission, business
-from app.core.config import settings
 
-Base.metadata.create_all(bind=engine)
+from app.core.config import settings
+from app.core.migrations_runner import run_migrations
+from app.routers import admin, auth, business, permission, task, user, wallet
+
+run_migrations()
 
 app = FastAPI(
     title="Logistics Task Marketplace",
