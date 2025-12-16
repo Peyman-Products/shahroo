@@ -12,6 +12,6 @@ def run_migrations() -> None:
     project_root = Path(__file__).resolve().parents[2]
     alembic_cfg = Config(str(project_root / "alembic.ini"))
     alembic_cfg.set_main_option("script_location", str(project_root / "migrations"))
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
     command.upgrade(alembic_cfg, "head")
