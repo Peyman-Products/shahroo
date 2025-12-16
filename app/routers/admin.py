@@ -5,6 +5,7 @@ from app.db import get_db
 from app.schemas.user import User as UserSchema, AdminUser, VerificationDecisionPayload
 from app.schemas.kyc import AdminKycSummary, AdminKycMedia, KycDecision
 from app.models.user import User, VerificationStatus
+from app.utils.media import MediaManager
 from app.models.kyc import KycAttempt
 from app.utils.deps import get_current_user, user_has_permission
 from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, TaskStepUpdate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
@@ -19,6 +20,7 @@ from app.schemas.otp import OTPAdminLookup, OTPAdminLookupResponse
 from app.utils.otp import get_valid_otp
 
 router = APIRouter()
+media_manager = MediaManager()
 
 
 def _parse_codes(codes: Optional[str]) -> Optional[List[str]]:
@@ -27,16 +29,10 @@ def _parse_codes(codes: Optional[str]) -> Optional[List[str]]:
     return [code for code in codes.split(",") if code]
 
 
-def _media_to_admin(media) -> Optional[AdminKycMedia]:
-    if not media:
+def _media_to_admin(path: str | None) -> Optional[AdminKycMedia]:
+    if not path:
         return None
-    return AdminKycMedia(
-        url=media.url,
-        mime_type=media.mime_type,
-        size_bytes=media.size_bytes,
-        checksum=media.checksum,
-        uploaded_at=media.created_at,
-    )
+    return AdminKycMedia(url=media_manager.url_for(path))
 
 
 def _admin_last_decision(user: User, attempt: Optional[KycAttempt]) -> Optional[KycDecision]:
@@ -63,8 +59,8 @@ def _build_admin_kyc_summary(user: User) -> AdminKycSummary:
         status=user.verification_status if user.verification_status != VerificationStatus.unverified else (attempt.status if attempt else VerificationStatus.unverified),
         attempt_id=attempt.id if attempt else None,
         attempts_count=len(user.kyc_attempts) if user.kyc_attempts else (1 if attempt else 0),
-        id_card=_media_to_admin(user.id_card_media),
-        selfie=_media_to_admin(user.selfie_media),
+        id_card=_media_to_admin(user.id_card_image),
+        selfie=_media_to_admin(user.selfie_image),
         last_decision=_admin_last_decision(user, attempt),
     )
 
@@ -125,7 +121,7 @@ def update_user_verification(user_id: int, payload: VerificationDecisionPayload,
     now = datetime.now(timezone.utc)
 
     if payload.status == VerificationStatus.verified:
-        if not db_user.id_card_media or not db_user.selfie_media:
+        if not db_user.id_card_image or not db_user.selfie_image:
             raise HTTPException(status_code=400, detail="KYC media is required before verification")
         attempt.status = VerificationStatus.verified
         attempt.decided_at = now

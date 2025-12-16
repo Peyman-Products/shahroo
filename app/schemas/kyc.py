@@ -19,10 +19,6 @@ class KycStatusResponse(BaseModel):
 
 class AdminKycMedia(BaseModel):
     url: str
-    mime_type: Optional[str]
-    size_bytes: Optional[int]
-    checksum: Optional[str]
-    uploaded_at: Optional[datetime]
 
 
 class AdminKycSummary(BaseModel):

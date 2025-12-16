@@ -30,8 +30,8 @@ def is_profile_complete(user: User) -> bool:
         user.national_id,
         user.shaba_number,
         user.address,
-        user.active_id_card_media_id or user.id_card_image,
-        user.active_selfie_media_id or user.selfie_image,
+        user.id_card_image,
+        user.selfie_image,
     ]
     return all(required_fields)
 

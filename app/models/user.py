@@ -1,7 +1,10 @@
+from pathlib import Path
+import enum
 from sqlalchemy import Column, Integer, String, DateTime, func, Date, Enum, ForeignKey
 from sqlalchemy.orm import relationship
+
+from app.core.config import settings
 from app.db import Base
-import enum
 
 class VerificationStatus(enum.Enum):
     unverified = "unverified"
@@ -23,10 +26,8 @@ class User(Base):
     address = Column(String, nullable=True)
     id_card_image = Column(String, nullable=True)
     selfie_image = Column(String, nullable=True)
+    avatar_image = Column(String, nullable=True)
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.unverified)
-    avatar_media_id = Column(Integer, ForeignKey("media_files.id"), nullable=True)
-    active_id_card_media_id = Column(Integer, ForeignKey("media_files.id"), nullable=True)
-    active_selfie_media_id = Column(Integer, ForeignKey("media_files.id"), nullable=True)
     current_kyc_attempt_id = Column(Integer, ForeignKey("kyc_attempts.id"), nullable=True)
     kyc_locked_at = Column(DateTime(timezone=True), nullable=True)
     kyc_last_reason_codes = Column(String, nullable=True)
@@ -34,14 +35,6 @@ class User(Base):
     kyc_last_decided_at = Column(DateTime(timezone=True), nullable=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
     role = relationship("Role")
-    media_files = relationship(
-        "MediaFile",
-        back_populates="owner_user",
-        foreign_keys="MediaFile.owner_user_id",
-    )
-    avatar_media = relationship("MediaFile", foreign_keys=[avatar_media_id])
-    id_card_media = relationship("MediaFile", foreign_keys=[active_id_card_media_id])
-    selfie_media = relationship("MediaFile", foreign_keys=[active_selfie_media_id])
     kyc_attempts = relationship(
         "KycAttempt",
         back_populates="user",
@@ -53,4 +46,8 @@ class User(Base):
 
     @property
     def avatar_url(self):
-        return self.avatar_media.url if self.avatar_media else None
+        if not self.avatar_image:
+            return None
+        base = settings.MEDIA_BASE_URL.rstrip("/")
+        normalized_path = str(Path(self.avatar_image)).lstrip("/")
+        return f"{base}/{normalized_path}"
