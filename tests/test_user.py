@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db import Base, get_db
-from app.models.user import User
+from app.models.user import User, VerificationStatus
 from app.utils.token import create_access_token
 import os
 
@@ -99,3 +99,22 @@ def test_upload_selfie():
     assert response.status_code == 200
     assert response.json()["status"] == "uploaded"
     assert "upload_id" in response.json()
+
+
+def test_user_me_returns_media_urls_for_unapproved_user():
+    phone_number = "+19999999999"
+    token, _ = create_or_get_user(
+        phone_number=phone_number,
+        verification_status=VerificationStatus.pending,
+        id_card_image="users/sample/kyc/id-card/example-id.jpg",
+        selfie_image="users/sample/kyc/selfie/example-selfie.jpg",
+    )
+
+    response = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["phone_number"] == phone_number
+    assert data["verification_status"] == VerificationStatus.pending.value
+    assert data["id_card_url"] == "/media/users/sample/kyc/id-card/example-id.jpg"
+    assert data["selfie_url"] == "/media/users/sample/kyc/selfie/example-selfie.jpg"
