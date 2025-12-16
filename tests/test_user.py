@@ -7,6 +7,9 @@ from app.models.user import User
 from app.utils.token import create_access_token
 import os
 
+if os.path.exists("test.db"):
+    os.remove("test.db")
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
@@ -77,20 +80,22 @@ def test_upload_id_card():
     token = get_test_user_token()
     file_content = b"test_image_content"
     response = client.post(
-        "/users/me/id-card",
+        "/users/me/kyc/id-card",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("test_id_card.jpg", io.BytesIO(file_content), "image/jpeg")},
     )
     assert response.status_code == 200
-    assert "path" in response.json()
+    assert response.json()["status"] == "uploaded"
+    assert "upload_id" in response.json()
 
 def test_upload_selfie():
     token = get_test_user_token()
     file_content = b"test_image_content"
     response = client.post(
-        "/users/me/selfie",
+        "/users/me/kyc/selfie",
         headers={"Authorization": f"Bearer {token}"},
         files={"file": ("test_selfie.jpg", io.BytesIO(file_content), "image/jpeg")},
     )
     assert response.status_code == 200
-    assert "path" in response.json()
+    assert response.json()["status"] == "uploaded"
+    assert "upload_id" in response.json()

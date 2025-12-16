@@ -11,3 +11,4 @@ pytest
 httpx
 pydantic-settings
 python-multipart
+aiofiles

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.db import get_db
-from app.schemas.user import User as UserSchema
+from app.schemas.user import User as UserSchema, AdminUser, VerificationDecisionPayload
+from app.schemas.kyc import AdminKycSummary, AdminKycMedia, KycDecision
 from app.models.user import User, VerificationStatus
+from app.models.kyc import KycAttempt
 from app.utils.deps import get_current_user, user_has_permission
 from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, TaskStepUpdate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
 from app.models.task import Task, TaskStep, TaskStatus, StepStatus
@@ -18,6 +19,54 @@ from app.schemas.otp import OTPAdminLookup, OTPAdminLookupResponse
 from app.utils.otp import get_valid_otp
 
 router = APIRouter()
+
+
+def _parse_codes(codes: Optional[str]) -> Optional[List[str]]:
+    if not codes:
+        return None
+    return [code for code in codes.split(",") if code]
+
+
+def _media_to_admin(media) -> Optional[AdminKycMedia]:
+    if not media:
+        return None
+    return AdminKycMedia(
+        url=media.url,
+        mime_type=media.mime_type,
+        size_bytes=media.size_bytes,
+        checksum=media.checksum,
+        uploaded_at=media.created_at,
+    )
+
+
+def _admin_last_decision(user: User, attempt: Optional[KycAttempt]) -> Optional[KycDecision]:
+    if user.kyc_last_decided_at:
+        return KycDecision(
+            status=user.verification_status,
+            reason_codes=_parse_codes(user.kyc_last_reason_codes),
+            reason_text=user.kyc_last_reason_text,
+            decided_at=user.kyc_last_decided_at,
+        )
+    if attempt and attempt.decided_at:
+        return KycDecision(
+            status=attempt.status,
+            reason_codes=_parse_codes(attempt.reason_codes),
+            reason_text=attempt.reason_text,
+            decided_at=attempt.decided_at,
+        )
+    return None
+
+
+def _build_admin_kyc_summary(user: User) -> AdminKycSummary:
+    attempt = user.current_kyc_attempt
+    return AdminKycSummary(
+        status=user.verification_status if user.verification_status != VerificationStatus.unverified else (attempt.status if attempt else VerificationStatus.unverified),
+        attempt_id=attempt.id if attempt else None,
+        attempts_count=len(user.kyc_attempts) if user.kyc_attempts else (1 if attempt else 0),
+        id_card=_media_to_admin(user.id_card_media),
+        selfie=_media_to_admin(user.selfie_media),
+        last_decision=_admin_last_decision(user, attempt),
+    )
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)):
     if not current_user.role or current_user.role.name not in ["admin", "owner"]:
@@ -44,17 +93,66 @@ def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), c
     users = db.query(User).offset(skip).limit(limit).all()
     return users
 
-@router.patch("/users/{user_id}/verification", response_model=UserSchema, summary="Update user verification status")
-def update_user_verification(user_id: int, status: VerificationStatus, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+
+@router.get("/users/{user_id}", response_model=AdminUser, summary="Get user with KYC media")
+def read_user_detail(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db_user.kyc = _build_admin_kyc_summary(db_user)
+    db_user.last_decision = _admin_last_decision(db_user, db_user.current_kyc_attempt)
+    return db_user
+
+@router.patch("/users/{user_id}/verification", response_model=AdminUser, summary="Update user verification status")
+def update_user_verification(user_id: int, payload: VerificationDecisionPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """
     Updates the verification status of a user. Only accessible by admin users.
     """
     db_user = db.query(User).filter(User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    db_user.verification_status = status
+
+    if payload.status == VerificationStatus.pending:
+        raise HTTPException(status_code=400, detail="Pending status is managed automatically by uploads")
+
+    attempt = db_user.current_kyc_attempt
+    if attempt is None:
+        attempt = KycAttempt(user_id=db_user.id, status=db_user.verification_status)
+        db.add(attempt)
+        db.flush()
+        db_user.current_kyc_attempt_id = attempt.id
+
+    now = datetime.now(timezone.utc)
+
+    if payload.status == VerificationStatus.verified:
+        if not db_user.id_card_media or not db_user.selfie_media:
+            raise HTTPException(status_code=400, detail="KYC media is required before verification")
+        attempt.status = VerificationStatus.verified
+        attempt.decided_at = now
+        attempt.allow_resubmission = False
+        db_user.verification_status = VerificationStatus.verified
+        db_user.kyc_locked_at = now
+        db_user.kyc_last_reason_codes = None
+        db_user.kyc_last_reason_text = None
+        db_user.kyc_last_decided_at = now
+    elif payload.status == VerificationStatus.rejected:
+        attempt.status = VerificationStatus.rejected
+        attempt.reason_codes = ",".join(payload.reason_codes) if payload.reason_codes else None
+        attempt.reason_text = payload.reason_text
+        attempt.decided_at = now
+        attempt.allow_resubmission = payload.allow_resubmission
+        db_user.verification_status = VerificationStatus.rejected
+        db_user.kyc_locked_at = None
+        db_user.kyc_last_reason_codes = attempt.reason_codes
+        db_user.kyc_last_reason_text = payload.reason_text
+        db_user.kyc_last_decided_at = now
+    else:
+        db_user.verification_status = payload.status
+
     db.commit()
     db.refresh(db_user)
+    db_user.kyc = _build_admin_kyc_summary(db_user)
+    db_user.last_decision = _admin_last_decision(db_user, attempt)
     return db_user
 
 
