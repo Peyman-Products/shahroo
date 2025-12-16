@@ -10,6 +10,10 @@ from app.models.business import Business
 from app.models.task import Task
 from app.models.otp import OTP
 from datetime import datetime, timedelta, timezone
+import os
+
+if os.path.exists("test.db"):
+    os.remove("test.db")
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 

@@ -9,5 +9,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     KAVENEGAR_API_KEY: str
     KAVENEGAR_OTP_TEMPLATE: str
+    MEDIA_ROOT: str = "media"
+    MEDIA_BASE_URL: str = "/media"
 
 settings = Settings()

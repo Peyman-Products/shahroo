@@ -10,3 +10,4 @@ kavenegar
 pydantic-settings
 python-multipart
 alembic
+aiofiles

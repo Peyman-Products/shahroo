@@ -1,18 +1,23 @@
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel
+from app.models.media import MediaType
 
-class MediaFileBase(BaseModel):
-    file_path: str
-    mime_type: str
-    size_bytes: int
 
-class MediaFileCreate(MediaFileBase):
-    pass
-
-class MediaFile(MediaFileBase):
+class Media(BaseModel):
     id: int
-    owner_user_id: int
+    type: MediaType
+    url: str
+    mime_type: Optional[str]
+    size_bytes: Optional[int]
     created_at: datetime
+    checksum: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class MediaUploadResponse(BaseModel):
+    status: str
+    upload_id: int
+    url: Optional[str] = None

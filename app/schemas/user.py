@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date
 from app.models.user import VerificationStatus
+from app.schemas.kyc import KycDecision
 
 class UserBase(BaseModel):
     phone_number: str
@@ -26,14 +27,28 @@ class UserUpdate(BaseModel):
     address: Optional[str] = Field(None, example="123 Main St")
 
 from app.schemas.permission import Role
+from app.schemas.kyc import AdminKycSummary
+from typing import List
+
 
 class User(UserBase):
     id: int
-    id_card_image: Optional[str] = None
-    selfie_image: Optional[str] = None
     verification_status: VerificationStatus
     role: Optional[Role] = None
     shaba_number: Optional[str] = None
+    avatar_url: Optional[str] = None
+    last_decision: Optional[KycDecision] = None
 
     class Config:
         from_attributes = True
+
+
+class AdminUser(User):
+    kyc: Optional[AdminKycSummary] = None
+
+
+class VerificationDecisionPayload(BaseModel):
+    status: VerificationStatus
+    reason_codes: Optional[List[str]] = None
+    reason_text: Optional[str] = None
+    allow_resubmission: bool = True
