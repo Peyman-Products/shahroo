@@ -42,7 +42,11 @@ class User(Base):
     avatar_media = relationship("MediaFile", foreign_keys=[avatar_media_id])
     id_card_media = relationship("MediaFile", foreign_keys=[active_id_card_media_id])
     selfie_media = relationship("MediaFile", foreign_keys=[active_selfie_media_id])
-    kyc_attempts = relationship("KycAttempt", back_populates="user")
+    kyc_attempts = relationship(
+        "KycAttempt",
+        back_populates="user",
+        foreign_keys="KycAttempt.user_id",
+    )
     current_kyc_attempt = relationship("KycAttempt", foreign_keys=[current_kyc_attempt_id])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
