@@ -19,8 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    mediatype = sa.Enum('id_card', 'selfie', 'avatar', name='mediatype')
-    mediatype.create(op.get_bind(), checkfirst=True)
+    mediatype_enum = postgresql.ENUM('id_card', 'selfie', 'avatar', name='mediatype')
+    mediatype_enum.create(op.get_bind(), checkfirst=True)
+    mediatype = postgresql.ENUM('id_card', 'selfie', 'avatar', name='mediatype', create_type=False)
     verification_status = postgresql.ENUM(
         'unverified',
         'pending',
@@ -105,5 +106,5 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_kyc_attempts_id'), table_name='kyc_attempts')
     op.drop_table('kyc_attempts')
 
-    mediatype = sa.Enum('id_card', 'selfie', 'avatar', name='mediatype')
-    mediatype.drop(op.get_bind(), checkfirst=True)
+    mediatype_enum = postgresql.ENUM('id_card', 'selfie', 'avatar', name='mediatype')
+    mediatype_enum.drop(op.get_bind(), checkfirst=True)
