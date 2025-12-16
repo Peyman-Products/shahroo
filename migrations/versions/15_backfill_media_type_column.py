@@ -31,9 +31,9 @@ def upgrade() -> None:
             """
             UPDATE media_files
             SET type = CASE
-                WHEN file_path ILIKE '%kyc/id-card%' OR file_path ILIKE '%id-card%' THEN 'id_card'
-                WHEN file_path ILIKE '%kyc/selfie%' OR file_path ILIKE '%selfie%' THEN 'selfie'
-                ELSE 'avatar'
+                WHEN file_path ILIKE '%kyc/id-card%' OR file_path ILIKE '%id-card%' THEN 'id_card'::mediatype
+                WHEN file_path ILIKE '%kyc/selfie%' OR file_path ILIKE '%selfie%' THEN 'selfie'::mediatype
+                ELSE 'avatar'::mediatype
             END
             WHERE type IS NULL
             """
