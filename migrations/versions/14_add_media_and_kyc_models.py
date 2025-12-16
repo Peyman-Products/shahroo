@@ -20,12 +20,20 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     mediatype = sa.Enum('id_card', 'selfie', 'avatar', name='mediatype')
     mediatype.create(op.get_bind(), checkfirst=True)
+    verification_status = sa.Enum(
+        'unverified',
+        'pending',
+        'verified',
+        'rejected',
+        name='verificationstatus',
+        create_type=False,
+    )
 
     op.create_table(
         'kyc_attempts',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('status', sa.Enum('unverified', 'pending', 'verified', 'rejected', name='verificationstatus'), nullable=True),
+        sa.Column('status', verification_status, nullable=True),
         sa.Column('reason_codes', sa.String(), nullable=True),
         sa.Column('reason_text', sa.String(), nullable=True),
         sa.Column('decided_at', sa.DateTime(timezone=True), nullable=True),
