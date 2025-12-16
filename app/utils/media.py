@@ -8,13 +8,20 @@ from app.models.media import MediaFile, MediaType
 
 
 class MediaManager:
+    MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
+
     def __init__(self, base_dir: str | Path | None = None):
         self.base_path = Path(base_dir or settings.MEDIA_ROOT)
         self.base_path.mkdir(parents=True, exist_ok=True)
+        self.max_file_size_bytes = self.MAX_FILE_SIZE_BYTES
 
     def _validate_upload(self, upload_file: UploadFile):
         if not upload_file.content_type or not upload_file.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Only image uploads are allowed")
+
+    def _validate_file_size(self, size_bytes: int):
+        if size_bytes > self.max_file_size_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file exceeds 20MB limit")
 
     def _folder_for(self, user_id: int, media_type: MediaType) -> Path:
         if media_type == MediaType.avatar:
@@ -50,6 +57,7 @@ class MediaManager:
 
         checksum = hashlib.sha256(content).hexdigest()
         size_bytes = len(content)
+        self._validate_file_size(size_bytes)
 
         with open(absolute_path, "wb") as buffer:
             buffer.write(content)
