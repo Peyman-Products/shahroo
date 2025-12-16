@@ -25,7 +25,11 @@ class MediaFile(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    owner_user = relationship("User", back_populates="media_files")
+    owner_user = relationship(
+        "User",
+        back_populates="media_files",
+        foreign_keys=[owner_user_id],
+    )
     kyc_attempt = relationship("KycAttempt", back_populates="media_files")
 
     @property
