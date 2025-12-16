@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -20,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     mediatype = sa.Enum('id_card', 'selfie', 'avatar', name='mediatype')
     mediatype.create(op.get_bind(), checkfirst=True)
-    verification_status = sa.Enum(
+    verification_status = postgresql.ENUM(
         'unverified',
         'pending',
         'verified',
