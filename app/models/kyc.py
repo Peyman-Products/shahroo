@@ -18,5 +18,5 @@ class KycAttempt(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    user = relationship("User", back_populates="kyc_attempts")
+    user = relationship("User", back_populates="kyc_attempts", foreign_keys=[user_id])
     media_files = relationship("MediaFile", back_populates="kyc_attempt")
