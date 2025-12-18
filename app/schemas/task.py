@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from app.models.task import TaskStatus, StepStatus
 from app.schemas.user import User as UserSchema
+from app.schemas.business import Business as BusinessSchema
 
 
 class TaskKindBase(BaseModel):
@@ -16,6 +17,22 @@ class TaskKindCreate(TaskKindBase):
 
 class TaskKind(TaskKindBase):
     id: int
+
+    class Config:
+        from_attributes = True
+
+
+class TaskCategory(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class TaskTag(BaseModel):
+    id: int
+    name: str
 
     class Config:
         from_attributes = True
@@ -94,6 +111,19 @@ class Task(TaskBase):
     accepted_at: Optional[datetime] = None
     done_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
+    created_by_admin_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    start_location_country_id: Optional[int] = None
+    start_location_province_id: Optional[int] = None
+    start_location_city_id: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+
+class AdminTask(Task):
+    business: Optional[BusinessSchema] = None
+    category: Optional[TaskCategory] = None
+    tags: List[TaskTag] = Field(default_factory=list)
+    created_by_admin: Optional[UserSchema] = None

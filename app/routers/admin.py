@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 from app.db import get_db
 from app.schemas.user import User as UserSchema, AdminUser, VerificationDecisionPayload
@@ -8,7 +9,7 @@ from app.models.user import User, VerificationStatus
 from app.utils.media import MediaManager
 from app.models.kyc import KycAttempt
 from app.utils.deps import get_current_user, user_has_permission
-from app.schemas.task import Task as TaskSchema, TaskCreate, TaskStepCreate, TaskStepUpdate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
+from app.schemas.task import AdminTask, Task as TaskSchema, TaskCreate, TaskStepCreate, TaskStepUpdate, TaskUpdate, TaskKind as TaskKindSchema, TaskKindCreate
 from app.models.task import Task, TaskStep, TaskStatus, StepStatus
 from app.models.task_meta import TaskKind
 from app.models.wallet import Wallet, WalletTransaction, TransactionType, TransactionStatus
@@ -203,18 +204,79 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: U
     db.refresh(db_task)
     return db_task
 
-@router.get("/tasks", response_model=List[TaskSchema], summary="List tasks with assigned user info")
-def list_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+@router.get("/tasks", response_model=List[AdminTask], summary="List tasks with filters, sorting, and detailed relations")
+def list_tasks(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[List[TaskStatus]] = Query(None, description="Filter by task status"),
+    business_id: Optional[int] = Query(None, description="Filter by business id"),
+    assigned_user_id: Optional[int] = Query(None, description="Filter by assigned user id"),
+    task_kind_id: Optional[int] = Query(None, description="Filter by task kind id"),
+    category_id: Optional[int] = Query(None, description="Filter by task category id"),
+    search: Optional[str] = Query(None, description="Search by title or description"),
+    start_from: Optional[datetime] = Query(None, description="Return tasks starting on or after this datetime"),
+    start_to: Optional[datetime] = Query(None, description="Return tasks starting on or before this datetime"),
+    sort_by: str = Query("created_at", description="Sort by one of: created_at, start_datetime, price, status, updated_at, accepted_at, done_at, approved_at"),
+    sort_order: str = Query("desc", description="Sort order: asc or desc"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     """
-    Retrieves tasks for admin users, including assigned user details and task steps.
+    Retrieves tasks for admin users with filtering and sorting support, including related entities.
     """
-    tasks = (
+    allowed_sort_fields = {
+        "created_at": Task.created_at,
+        "start_datetime": Task.start_datetime,
+        "price": Task.price,
+        "status": Task.status,
+        "updated_at": Task.updated_at,
+        "accepted_at": Task.accepted_at,
+        "done_at": Task.done_at,
+        "approved_at": Task.approved_at,
+    }
+
+    sort_field = allowed_sort_fields.get(sort_by)
+    if not sort_field:
+        raise HTTPException(status_code=400, detail="Invalid sort field")
+
+    sort_order_normalized = sort_order.lower()
+    if sort_order_normalized not in {"asc", "desc"}:
+        raise HTTPException(status_code=400, detail="Invalid sort order")
+
+    query = (
         db.query(Task)
-        .options(joinedload(Task.assigned_user), joinedload(Task.steps))
-        .offset(skip)
-        .limit(limit)
-        .all()
+        .options(
+            joinedload(Task.assigned_user),
+            joinedload(Task.business),
+            joinedload(Task.category),
+            joinedload(Task.kind),
+            joinedload(Task.created_by_admin),
+            selectinload(Task.tags),
+            selectinload(Task.steps),
+        )
     )
+
+    if status:
+        query = query.filter(Task.status.in_(status))
+    if business_id is not None:
+        query = query.filter(Task.business_id == business_id)
+    if assigned_user_id is not None:
+        query = query.filter(Task.assigned_user_id == assigned_user_id)
+    if task_kind_id is not None:
+        query = query.filter(Task.task_kind_id == task_kind_id)
+    if category_id is not None:
+        query = query.filter(Task.category_id == category_id)
+    if start_from is not None:
+        query = query.filter(Task.start_datetime >= start_from)
+    if start_to is not None:
+        query = query.filter(Task.start_datetime <= start_to)
+    if search:
+        normalized_search = f"%{search.strip()}%"
+        query = query.filter(or_(Task.title.ilike(normalized_search), Task.description.ilike(normalized_search)))
+
+    order_by_clause = sort_field.desc() if sort_order_normalized == "desc" else sort_field.asc()
+
+    tasks = query.order_by(order_by_clause).offset(skip).limit(limit).all()
     return tasks
 
 @router.get("/tasks/{task_id}", response_model=TaskSchema, summary="Get task details with assigned user info")

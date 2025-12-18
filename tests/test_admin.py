@@ -7,7 +7,7 @@ from app.models.user import User, VerificationStatus
 from app.models.permission import Role
 from app.utils.token import create_access_token
 from app.models.business import Business
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.otp import OTP
 from datetime import datetime, timedelta, timezone
 import os
@@ -144,3 +144,67 @@ def test_admin_lookup_returns_not_found_for_invalid_otp():
 
     assert response.status_code == 404
     assert response.json() == {"detail": "No valid OTP found"}
+
+
+def test_admin_task_list_supports_filters_and_sorting():
+    token = get_admin_token()
+    db = TestingSessionLocal()
+
+    business = Business(name="Filter Business", contact_person="Filter Person", phone_number="+15555555570", address="Filter Address")
+    other_business = Business(name="Other Filter Business", contact_person="Other Person", phone_number="+15555555571", address="Other Address")
+    db.add_all([business, other_business])
+    db.commit()
+    db.refresh(business)
+    db.refresh(other_business)
+
+    user = User(phone_number="+15555555572", verification_status=VerificationStatus.verified)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    task_one = Task(
+        title="Deliver documents",
+        business_id=business.id,
+        price=50.0,
+        estimated_time=45,
+        start_datetime=datetime.now(timezone.utc),
+        status=TaskStatus.issued,
+        assigned_user_id=user.id,
+    )
+    task_two = Task(
+        title="Pick up package",
+        business_id=business.id,
+        price=30.0,
+        estimated_time=30,
+        start_datetime=datetime.now(timezone.utc),
+        status=TaskStatus.issued,
+    )
+    task_three = Task(
+        title="Unrelated business task",
+        business_id=other_business.id,
+        price=70.0,
+        estimated_time=60,
+        start_datetime=datetime.now(timezone.utc),
+        status=TaskStatus.issued,
+    )
+    db.add_all([task_one, task_two, task_three])
+    db.commit()
+
+    response = client.get(
+        "/admin/tasks",
+        headers={"Authorization": f"Bearer {token}"},
+        params=[
+            ("status", TaskStatus.issued.value),
+            ("business_id", business.id),
+            ("sort_by", "price"),
+            ("sort_order", "asc"),
+        ],
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["price"] <= data[1]["price"]
+    assert all(task["business"]["id"] == business.id for task in data)
+    assert any(task["assigned_user_id"] == user.id for task in data)
+    db.close()
