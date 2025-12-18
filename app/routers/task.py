@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db import get_db
 from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate, TaskStepUpdate
@@ -10,12 +10,66 @@ from datetime import datetime, timezone
 
 router = APIRouter()
 
+USER_TASK_STATUS_FILTERS = {
+    "all": None,
+    "pending": [TaskStatus.issued],
+    "ongoing": [TaskStatus.in_progress],
+    "done": [TaskStatus.done, TaskStatus.approved],
+    "approved": [TaskStatus.approved],
+    "canceled": [TaskStatus.canceled],
+    "failed": [TaskStatus.failed],
+    "rejected": [TaskStatus.rejected],
+}
+
 @router.get("/", response_model=List[TaskSchema], summary="Get all tasks")
 def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
-    Retrieves a list of all tasks.
+    Retrieves a list of all available tasks that have not been accepted or assigned.
     """
-    tasks = db.query(Task).offset(skip).limit(limit).all()
+    tasks = (
+        db.query(Task)
+        .options(joinedload(Task.steps))
+        .filter(
+            Task.status == TaskStatus.issued,
+            Task.assigned_user_id.is_(None),
+            Task.accepted_at.is_(None),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return tasks
+
+
+@router.get("/me", response_model=List[TaskSchema], summary="Get current user's tasks")
+def read_my_tasks(
+    status: str = Query(
+        "all",
+        description="Filter tasks by status: all, pending, ongoing, done, approved, canceled, failed, rejected",
+    ),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieves tasks assigned to the current user with optional status filtering.
+    """
+    normalized_status = status.lower()
+    if normalized_status not in USER_TASK_STATUS_FILTERS:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
+    query = (
+        db.query(Task)
+        .options(joinedload(Task.steps))
+        .filter(Task.assigned_user_id == current_user.id)
+    )
+
+    status_filter = USER_TASK_STATUS_FILTERS[normalized_status]
+    if status_filter:
+        query = query.filter(Task.status.in_(status_filter))
+
+    tasks = query.offset(skip).limit(limit).all()
     return tasks
 
 @router.get("/me/ongoing", response_model=List[TaskSchema], summary="Get current user's ongoing tasks")

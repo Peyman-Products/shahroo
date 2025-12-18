@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.db import get_db
 from app.schemas.user import User as UserSchema, AdminUser, VerificationDecisionPayload
@@ -201,6 +201,35 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: U
         db.add(db_step)
     db.commit()
     db.refresh(db_task)
+    return db_task
+
+@router.get("/tasks", response_model=List[TaskSchema], summary="List tasks with assigned user info")
+def list_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Retrieves tasks for admin users, including assigned user details and task steps.
+    """
+    tasks = (
+        db.query(Task)
+        .options(joinedload(Task.assigned_user), joinedload(Task.steps))
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return tasks
+
+@router.get("/tasks/{task_id}", response_model=TaskSchema, summary="Get task details with assigned user info")
+def get_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+    """
+    Retrieves a specific task along with assigned user details and task steps.
+    """
+    db_task = (
+        db.query(Task)
+        .options(joinedload(Task.assigned_user), joinedload(Task.steps))
+        .filter(Task.id == task_id)
+        .first()
+    )
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
     return db_task
 
 @router.patch("/tasks/{task_id}", response_model=TaskSchema, summary="Update a task")
