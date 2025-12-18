@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.db import get_db
 from app.schemas.user import User as UserSchema, UserUpdate
-from app.schemas.kyc import KycStatusResponse, KycDecision
+from app.schemas.kyc import KycStatusResponse, KycDecision, KycMediaStatusResponse, KycMediaUploadResponse, KycMedia
 from app.schemas.media import MediaUploadResponse
 from app.models.user import User, VerificationStatus
 from app.models.media import MediaType
@@ -27,8 +27,15 @@ def _reset_rejection_state(user: User, attempt: KycAttempt | None):
 
 
 def _get_or_create_attempt(db: Session, user: User) -> KycAttempt:
-    if user.current_kyc_attempt and user.verification_status != VerificationStatus.rejected:
-        return user.current_kyc_attempt
+    attempt = user.current_kyc_attempt
+    needs_new_attempt = (
+        attempt is None
+        or user.verification_status == VerificationStatus.rejected
+        or (attempt.status == VerificationStatus.verified and user.verification_status != VerificationStatus.verified)
+    )
+
+    if not needs_new_attempt:
+        return attempt
     attempt = KycAttempt(user_id=user.id, status=VerificationStatus.unverified, allow_resubmission=True)
     db.add(attempt)
     db.flush()
@@ -50,6 +57,12 @@ def _maybe_mark_pending(user: User, attempt: KycAttempt):
         attempt.status = VerificationStatus.pending
         attempt.submitted_at = datetime.now(timezone.utc)
         user.verification_status = VerificationStatus.pending
+
+
+def _media_payload(path: str | None) -> KycMedia | None:
+    if not path:
+        return None
+    return KycMedia(file_name=path, url=media_manager.url_for(path))
 
 
 def _last_decision(user: User) -> KycDecision | None:
@@ -131,7 +144,7 @@ def upload_id_card(file: UploadFile = File(...), db: Session = Depends(get_db), 
     current_user.id_card_image = path
     _maybe_mark_pending(current_user, attempt)
     db.commit()
-    return MediaUploadResponse(status="uploaded", file_name=path)
+    return MediaUploadResponse(status="uploaded", file_name=path, url=media_manager.url_for(path))
 
 
 @router.post("/me/kyc/selfie", response_model=MediaUploadResponse, summary="Upload selfie image")
@@ -150,7 +163,49 @@ def upload_selfie(file: UploadFile = File(...), db: Session = Depends(get_db), c
     current_user.selfie_image = path
     _maybe_mark_pending(current_user, attempt)
     db.commit()
-    return MediaUploadResponse(status="uploaded", file_name=path)
+    return MediaUploadResponse(status="uploaded", file_name=path, url=media_manager.url_for(path))
+
+
+@router.post(
+    "/me/kyc/media",
+    response_model=KycMediaUploadResponse,
+    summary="Upload ID card and selfie images in a single request",
+)
+def upload_kyc_media(
+    id_card: UploadFile = File(...),
+    selfie: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Uploads both the ID card and selfie images for the current user in one request.
+    Returns the saved media metadata and the resulting KYC status.
+    """
+    _ensure_can_upload_kyc(current_user)
+    attempt = _get_or_create_attempt(db, current_user)
+
+    id_card_path = media_manager.save_user_media(
+        user_id=current_user.id,
+        media_type=MediaType.id_card,
+        upload_file=id_card,
+    )
+    selfie_path = media_manager.save_user_media(
+        user_id=current_user.id,
+        media_type=MediaType.selfie,
+        upload_file=selfie,
+    )
+
+    current_user.id_card_image = id_card_path
+    current_user.selfie_image = selfie_path
+
+    _maybe_mark_pending(current_user, attempt)
+    db.commit()
+
+    return KycMediaUploadResponse(
+        status=current_user.verification_status,
+        id_card=_media_payload(id_card_path),
+        selfie=_media_payload(selfie_path),
+    )
 
 
 @router.post("/me/avatar", response_model=MediaUploadResponse, summary="Upload avatar image")
@@ -172,4 +227,36 @@ def kyc_status(current_user: User = Depends(get_current_user)):
         verification_status=current_user.verification_status,
         last_decision=last_decision,
         can_upload_kyc=current_user.verification_status in {VerificationStatus.unverified, VerificationStatus.rejected},
+    )
+
+
+@router.get(
+    "/me/kyc/media",
+    response_model=KycMediaStatusResponse,
+    summary="Get uploaded KYC media with status-aware messaging",
+)
+def get_kyc_media(current_user: User = Depends(get_current_user)):
+    status = current_user.verification_status
+
+    if status == VerificationStatus.verified:
+        return KycMediaStatusResponse(
+            status=status,
+            message="You have been approved.",
+        )
+
+    id_card = _media_payload(current_user.id_card_image)
+    selfie = _media_payload(current_user.selfie_image)
+
+    if status == VerificationStatus.rejected:
+        message = "Your verification images were denied. Please upload new images."
+    elif status == VerificationStatus.pending:
+        message = "Your verification images are pending review."
+    else:
+        message = "Please upload your verification images."
+
+    return KycMediaStatusResponse(
+        status=status,
+        message=message,
+        id_card=id_card,
+        selfie=selfie,
     )

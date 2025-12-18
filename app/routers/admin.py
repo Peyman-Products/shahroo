@@ -131,6 +131,24 @@ def update_user_verification(user_id: int, payload: VerificationDecisionPayload,
         db_user.kyc_last_reason_codes = None
         db_user.kyc_last_reason_text = None
         db_user.kyc_last_decided_at = now
+    elif payload.status == VerificationStatus.unverified:
+        if attempt.status == VerificationStatus.verified:
+            attempt = KycAttempt(user_id=db_user.id, status=VerificationStatus.unverified, allow_resubmission=True)
+            db.add(attempt)
+            db.flush()
+            db_user.current_kyc_attempt_id = attempt.id
+        else:
+            attempt.status = VerificationStatus.unverified
+            attempt.decided_at = None
+            attempt.reason_codes = None
+            attempt.reason_text = None
+            attempt.allow_resubmission = True
+
+        db_user.verification_status = VerificationStatus.unverified
+        db_user.kyc_locked_at = None
+        db_user.kyc_last_reason_codes = None
+        db_user.kyc_last_reason_text = None
+        db_user.kyc_last_decided_at = None
     elif payload.status == VerificationStatus.rejected:
         attempt.status = VerificationStatus.rejected
         attempt.reason_codes = ",".join(payload.reason_codes) if payload.reason_codes else None

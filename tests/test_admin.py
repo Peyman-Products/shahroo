@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db import Base, get_db
-from app.models.user import User
+from app.models.user import User, VerificationStatus
 from app.models.permission import Role
 from app.utils.token import create_access_token
 from app.models.business import Business
@@ -58,6 +58,32 @@ def test_get_users():
     response = client.get("/admin/users", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_admin_can_deapprove_verified_user():
+    token = get_admin_token()
+    db = TestingSessionLocal()
+    user = User(
+        phone_number="+15555555580",
+        verification_status=VerificationStatus.verified,
+        id_card_image="users/sample/kyc/id-card/example-id.jpg",
+        selfie_image="users/sample/kyc/selfie/example-selfie.jpg",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    response = client.patch(
+        f"/admin/users/{user.id}/verification",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"status": VerificationStatus.unverified.value},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verification_status"] == VerificationStatus.unverified.value
+    assert data["kyc"]["status"] == VerificationStatus.unverified.value
+    db.close()
 
 def test_create_business():
     token = get_admin_token()
