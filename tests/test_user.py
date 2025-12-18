@@ -76,29 +76,25 @@ def test_update_user_me_duplicate_shaba_number():
 
 import io
 
-def test_upload_id_card():
-    token = get_test_user_token()
-    file_content = b"test_image_content"
-    response = client.post(
-        "/users/me/kyc/id-card",
-        headers={"Authorization": f"Bearer {token}"},
-        files={"file": ("test_id_card.jpg", io.BytesIO(file_content), "image/jpeg")},
-    )
-    assert response.status_code == 200
-    assert response.json()["status"] == "uploaded"
-    assert "upload_id" in response.json()
 
-def test_upload_selfie():
+def test_upload_kyc_media_in_single_request_returns_urls_and_status():
     token = get_test_user_token()
     file_content = b"test_image_content"
+
     response = client.post(
-        "/users/me/kyc/selfie",
+        "/users/me/kyc/media",
         headers={"Authorization": f"Bearer {token}"},
-        files={"file": ("test_selfie.jpg", io.BytesIO(file_content), "image/jpeg")},
+        files={
+            "id_card": ("test_id_card.jpg", io.BytesIO(file_content), "image/jpeg"),
+            "selfie": ("test_selfie.jpg", io.BytesIO(file_content), "image/jpeg"),
+        },
     )
+
     assert response.status_code == 200
-    assert response.json()["status"] == "uploaded"
-    assert "upload_id" in response.json()
+    data = response.json()
+    assert data["status"] == VerificationStatus.pending.value
+    assert data["id_card"]["url"].startswith("/media/users/")
+    assert data["selfie"]["url"].startswith("/media/users/")
 
 
 def test_user_me_returns_media_urls_for_unapproved_user():
@@ -118,3 +114,60 @@ def test_user_me_returns_media_urls_for_unapproved_user():
     assert data["verification_status"] == VerificationStatus.pending.value
     assert data["id_card_url"] == "/media/users/sample/kyc/id-card/example-id.jpg"
     assert data["selfie_url"] == "/media/users/sample/kyc/selfie/example-selfie.jpg"
+
+
+def test_get_kyc_media_returns_images_for_unapproved_user():
+    phone_number = "+18888888888"
+    token, _ = create_or_get_user(
+        phone_number=phone_number,
+        verification_status=VerificationStatus.pending,
+        id_card_image="users/sample/kyc/id-card/example-id.jpg",
+        selfie_image="users/sample/kyc/selfie/example-selfie.jpg",
+    )
+
+    response = client.get("/users/me/kyc/media", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == VerificationStatus.pending.value
+    assert data["id_card"]["url"].endswith("example-id.jpg")
+    assert data["selfie"]["url"].endswith("example-selfie.jpg")
+    assert "pending review" in data["message"].lower()
+
+
+def test_get_kyc_media_returns_approval_message_for_verified_user():
+    phone_number = "+17777777778"
+    token, _ = create_or_get_user(
+        phone_number=phone_number,
+        verification_status=VerificationStatus.verified,
+        id_card_image="users/sample/kyc/id-card/example-id.jpg",
+        selfie_image="users/sample/kyc/selfie/example-selfie.jpg",
+    )
+
+    response = client.get("/users/me/kyc/media", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == VerificationStatus.verified.value
+    assert data["id_card"] is None
+    assert data["selfie"] is None
+    assert "approved" in data["message"].lower()
+
+
+def test_get_kyc_media_returns_denied_message_with_images_for_rejected_user():
+    phone_number = "+16666666667"
+    token, _ = create_or_get_user(
+        phone_number=phone_number,
+        verification_status=VerificationStatus.rejected,
+        id_card_image="users/sample/kyc/id-card/example-id.jpg",
+        selfie_image="users/sample/kyc/selfie/example-selfie.jpg",
+    )
+
+    response = client.get("/users/me/kyc/media", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == VerificationStatus.rejected.value
+    assert data["id_card"]["url"].endswith("example-id.jpg")
+    assert data["selfie"]["url"].endswith("example-selfie.jpg")
+    assert "denied" in data["message"].lower()

@@ -28,3 +28,21 @@ class AdminKycSummary(BaseModel):
     id_card: Optional[AdminKycMedia] = None
     selfie: Optional[AdminKycMedia] = None
     last_decision: Optional[KycDecision] = None
+
+
+class KycMedia(BaseModel):
+    file_name: str
+    url: str
+
+
+class KycMediaUploadResponse(BaseModel):
+    status: VerificationStatus
+    id_card: KycMedia
+    selfie: KycMedia
+
+
+class KycMediaStatusResponse(BaseModel):
+    status: VerificationStatus
+    message: str
+    id_card: Optional[KycMedia] = None
+    selfie: Optional[KycMedia] = None
