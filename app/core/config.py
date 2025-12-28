@@ -11,5 +11,7 @@ class Settings(BaseSettings):
     KAVENEGAR_OTP_TEMPLATE: str
     MEDIA_ROOT: str = "media"
     MEDIA_BASE_URL: str = "/media"
+    BOOTSTRAP_ADMIN_PHONE: str | None = None
+    BOOTSTRAP_ADMIN_FORCE: bool = False
 
 settings = Settings()
